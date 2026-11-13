@@ -1,6 +1,8 @@
 import { Navigate, type RouteObject } from "react-router";
 import { AdminGuard } from "./layouts/admin-layout.tsx";
 import { CustomerLayout } from "./layouts/customer-layout.tsx";
+import { AdminOrderPage, AdminOrdersPage, adminOrderLoader, adminOrdersLoader } from "./routes/admin-orders-pages.tsx";
+import { AdminInventoryPage, inventoryLoader } from "./routes/admin-inventory-page.tsx";
 import { CartPage, cartLoader } from "./routes/cart-page.tsx";
 import { CategoryPage, categoryLoader } from "./routes/category-page.tsx";
 import { CheckoutPage, checkoutLoader } from "./routes/checkout-page.tsx";
@@ -38,7 +40,13 @@ export const routes: RouteObject[] = [
           { path: "*", element: <NotFoundPage /> },
         ],
       },
-      { path: "admin", element: <AdminGuard />, children: [{ index: true, element: <Navigate to="/admin/orders" replace /> }] },
+      { path: "admin", element: <AdminGuard />, children: [
+          { index: true, element: <Navigate to="/admin/orders" replace /> },
+          { path: "orders", element: <AdminOrdersPage />, loader: adminOrdersLoader },
+          { path: "orders/:orderId", element: <AdminOrderPage />, loader: adminOrderLoader },
+          { path: "inventory", element: <AdminInventoryPage />, loader: inventoryLoader },
+        ],
+      },
       { path: "logout", loader: logoutLoader, action: logoutAction },
     ],
   },
