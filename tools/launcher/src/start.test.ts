@@ -1,9 +1,11 @@
 import { spawn } from "node:child_process";
-import { existsSync, mkdirSync, readdirSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, rmSync, symlinkSync, utimesSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
-import { createFixture, originalClaudeState, type Fixture } from "./test-fixture.ts";
+import { REPO_ROOT } from "./paths.ts";
+import { hasReleaseFile } from "./dependencies.ts";
+import { createFixture, originalClaudeState, TEST_PLATFORM, type Fixture } from "./test-fixture.ts";
 
 let fixture: Fixture | null = null;
 afterEach(() => {
@@ -69,9 +71,130 @@ describe("node start.mjs", () => {
     expect(result.stdout).not.toContain("[7/7]");
     // claude를 부르는 모든 곳(--version 포함)이 실습 설정 폴더를 쓴다.
     expect(fixture.claudeLog()).toEqual([{ args: ["--version"], configDir: fixture.practiceDir, cwd: fixture.repo }]);
+    expect(fixture.npmLog()).toEqual([]);
     expect(existsSync(fixture.practiceDir)).toBe(true);
     expect(readFileSync(path.join(fixture.repo, ".env"), "utf8")).toBe(readFileSync(path.join(fixture.repo, ".env.example"), "utf8"));
     expect(originalClaudeState(fixture)).toEqual(before);
+  });
+
+  describe("의존성 단계는 파일 시각이 아니라 lock 내용으로 설치 여부를 판정한다", () => {
+    it("내용은 같고 시각만 바뀐 경우(압축 해제·checkout·touch)에는 npm ci를 부르지 않는다", () => {
+      fixture = createFixture();
+      const day = 24 * 3600;
+      const now = Date.now() / 1000;
+      // 압축 해제처럼 package-lock.json이 설치 기록보다 훨씬 새로워진 상태
+      utimesSync(path.join(fixture.repo, "package-lock.json"), now + day, now + day);
+      utimesSync(fixture.hiddenLockFile, now - 30 * day, now - 30 * day);
+      const result = fixture.run("start.mjs", ["--check"]);
+
+      expect(result.status, result.stderr).toBe(0);
+      expect(result.stdout).toContain("[4/7] 의존성: 통과 (이미 설치됨)");
+      expect(fixture.npmLog()).toEqual([]);
+    });
+
+    it("이 컴퓨터에 설치되지 않는 optional 바이너리가 숨은 lock에 없어도 설치된 것으로 본다", () => {
+      fixture = createFixture();
+      const lock = fixture.readLock();
+      const skipped = Object.entries(lock.packages).filter(([, entry]) => entry.optional === true && Array.isArray(entry.os) && !entry.os.includes(TEST_PLATFORM.os));
+      expect(skipped.length).toBeGreaterThan(0);
+      const installed = fixture.readHiddenLock().packages;
+      expect(skipped.every(([location]) => !(location in installed))).toBe(true);
+      const result = fixture.run("start.mjs", ["--check"]);
+
+      expect(result.status, result.stderr).toBe(0);
+      expect(result.stdout).toContain("[4/7] 의존성: 통과 (이미 설치됨)");
+      expect(fixture.npmLog()).toEqual([]);
+    });
+
+    it("설치된 패키지 버전이 package-lock.json과 다르면 npm ci를 부르고 이유를 보인다", () => {
+      fixture = createFixture();
+      const [location] = Object.entries(fixture.readLock().packages).find(([name, entry]) => name !== "" && entry.optional !== true && entry.resolved !== undefined) ?? [];
+      if (location === undefined) throw new Error("테스트에 쓸 패키지가 package-lock.json에 없습니다.");
+      fixture.editHiddenLock((packages) => {
+        packages[location] = { ...packages[location], version: "0.0.1" };
+      });
+      const result = fixture.run("start.mjs", ["--check"]);
+
+      expect(result.status, result.stderr).toBe(0);
+      expect(result.stdout).toContain(`${location}의 버전이`);
+      expect(result.stdout).toContain("설치된 것: 0.0.1");
+      expect(result.stdout).toContain("[4/7] 의존성: 새로 설치함 (npm ci)");
+      expect(fixture.npmLog()).toEqual([{ args: ["ci"], cwd: fixture.repo }]);
+    });
+
+    // libc가 지정된 optional(Linux 바이너리)은 판정하지 않는다. 그 규칙은 dependencies.test.ts가 플랫폼을 넣어 확인한다.
+    const hereBinary = Object.entries((JSON.parse(readFileSync(path.join(REPO_ROOT, "package-lock.json"), "utf8")) as { packages: Record<string, Record<string, unknown>> }).packages).find(
+      ([, entry]) =>
+        entry.optional === true &&
+        entry.libc === undefined &&
+        Array.isArray(entry.os) &&
+        Array.isArray(entry.cpu) &&
+        entry.os.includes(TEST_PLATFORM.os) &&
+        entry.cpu.includes(TEST_PLATFORM.cpu),
+    )?.[0];
+    it.skipIf(hereBinary === undefined)("이 컴퓨터용 optional 바이너리가 빠진 node_modules(다른 OS·CPU용 압축 파일)는 npm ci를 부른다", () => {
+      fixture = createFixture();
+      const missing = hereBinary ?? "";
+      fixture.replaceHiddenLockPackages((packages) => Object.fromEntries(Object.entries(packages).filter(([name]) => name !== missing)));
+      const result = fixture.run("start.mjs", ["--check"]);
+
+      expect(result.status, result.stderr).toBe(0);
+      expect(result.stdout).toContain(missing);
+      expect(result.stdout).toContain("[4/7] 의존성: 새로 설치함 (npm ci)");
+      expect(fixture.npmLog()).toEqual([{ args: ["ci"], cwd: fixture.repo }]);
+    });
+
+    it("패키지 폴더가 빠진 node_modules(압축 해제가 건너뜀)는 이유와 함께 npm ci를 부른다", () => {
+      fixture = createFixture();
+      const location = Object.keys(fixture.readHiddenLock().packages).find((name) => name.startsWith("node_modules/") && !name.startsWith("node_modules/zod"));
+      if (location === undefined) throw new Error("테스트에 쓸 패키지가 없습니다.");
+      rmSync(path.join(fixture.repo, location), { recursive: true, force: true });
+      const result = fixture.run("start.mjs", ["--check"]);
+
+      expect(result.status, result.stderr).toBe(0);
+      expect(result.stdout).toContain(`${location}/package.json이 없습니다`);
+      expect(fixture.npmLog()).toEqual([{ args: ["ci"], cwd: fixture.repo }]);
+    });
+
+    it("숨은 lock이 없으면 npm ci를 부른다", () => {
+      fixture = createFixture();
+      rmSync(fixture.hiddenLockFile);
+      const result = fixture.run("start.mjs", ["--check"]);
+
+      expect(result.status, result.stderr).toBe(0);
+      expect(result.stdout).toContain("node_modules/.package-lock.json이 없습니다");
+      expect(result.stdout).toContain("[4/7] 의존성: 새로 설치함 (npm ci)");
+      expect(fixture.npmLog()).toEqual([{ args: ["ci"], cwd: fixture.repo }]);
+    });
+
+    it("고정물에서 npm ci가 돌아도 레포의 진짜 node_modules는 그대로다", () => {
+      fixture = createFixture();
+      const real = path.join(REPO_ROOT, "node_modules");
+      const snapshot = () => ({ entries: readdirSync(real).sort(), hidden: readFileSync(path.join(real, ".package-lock.json"), "utf8") });
+      const before = snapshot();
+      const fixtureModules = path.join(fixture.repo, "node_modules");
+      rmSync(fixture.hiddenLockFile);
+      const result = fixture.run("start.mjs", ["--check"]);
+
+      expect(result.status, result.stderr).toBe(0);
+      expect(fixture.npmLog()).toEqual([{ args: ["ci"], cwd: fixture.repo }]);
+      expect(snapshot()).toEqual(before);
+      const links = readdirSync(fixtureModules).filter((name) => lstatSync(path.join(fixtureModules, name)).isSymbolicLink());
+      expect(links).toEqual([]);
+    });
+
+    it("npm ci가 실패하면 그 컴퓨터에 맞는 안내(Release 파일이 있으면 링크, 없으면 없다는 말)와 함께 그 단계에서 멈춘다", () => {
+      fixture = createFixture();
+      rmSync(fixture.hiddenLockFile);
+      fixture.env.FAKE_NPM_EXIT = "1";
+      const result = fixture.run("start.mjs", ["--check"]);
+
+      expect(result.status).not.toBe(0);
+      expect(result.stderr).toContain("[4/7] 의존성: 실패");
+      if (hasReleaseFile(TEST_PLATFORM)) expect(result.stderr).toContain("https://github.com/yansfil/shop-harness-workshop/releases");
+      else expect(result.stderr).toContain("이 컴퓨터용 압축 파일은 없습니다");
+      expect(result.stdout + result.stderr).not.toContain("[5/7]");
+    });
   });
 
   it("실습 설정 폴더와 관찰 Hook으로 claude를 띄우고 claude의 종료 코드로 끝나며 원래 ~/.claude는 그대로다", () => {
