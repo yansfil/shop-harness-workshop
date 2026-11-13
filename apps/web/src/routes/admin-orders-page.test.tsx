@@ -61,7 +61,7 @@ function loginAsAdmin() {
   api.on("GET /api/auth/me", () => ({ json: { user: { id: 1, name: "그랩마켓 운영자", email: "admin@grabmarket.test", role: "admin", phone: null, address: null } } }));
 }
 
-describe("관리자 주문 목록 (B13 과제 정답)", () => {
+describe("관리자 주문 목록 (과제 정답)", () => {
   it("상태 칩에 개수가 있고, 전체 건수와 지금 범위를 보인다", async () => {
     loginAsAdmin();
     api.on("GET /api/admin/orders", () => ({ json: listing() }));
