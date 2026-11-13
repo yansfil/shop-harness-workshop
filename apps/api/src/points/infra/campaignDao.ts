@@ -58,3 +58,15 @@ export function ledgerBetween(fromIso: string, toIso: string): any[] {
     toIso,
   );
 }
+
+/** 관리자 고객 찾기: 이메일·이름 일부 */
+export function searchMembers(keyword: string, limit: number): any[] {
+  const like = "%" + keyword.toLowerCase() + "%";
+  return all(
+    "SELECT u.id, u.email, u.name, COALESCE(b.balance, 0) AS balance, (SELECT MAX(created_at) FROM point_ledger l WHERE l.user_id = u.id) AS last_at " +
+      "FROM users u LEFT JOIN point_balances b ON b.user_id = u.id WHERE u.role = 'customer' AND (lower(u.email) LIKE ? OR lower(u.name) LIKE ?) ORDER BY u.id LIMIT ?",
+    like,
+    like,
+    limit,
+  );
+}

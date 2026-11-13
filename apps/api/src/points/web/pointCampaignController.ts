@@ -38,6 +38,14 @@ export function registerPointCampaignRoutes(router: Router): void {
   );
 
   router.get(
+    "/api/admin/point-members",
+    wrap((req, res) => {
+      mustAdmin(res);
+      ok(res, pointCampaigns.findMembers(queryStr(req, "q")));
+    }),
+  );
+
+  router.get(
     "/api/admin/point-ledger.csv",
     wrap((req, res) => {
       mustAdmin(res);

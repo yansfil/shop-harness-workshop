@@ -180,3 +180,22 @@ export function ledgerCsv(fromInput: any, toInput: any): any {
     ]),
   };
 }
+
+/** 관리자: 포인트 볼 고객 찾기 */
+export function findMembers(keywordInput: any): any {
+  const keyword = trim(keywordInput);
+  if (keyword.length < 2) return { keyword: keyword, members: [], message: "두 글자 이상 넣어 주세요." };
+  const rows = campaignDao.searchMembers(keyword.slice(0, 40), 30);
+  return {
+    keyword: keyword,
+    members: rows.map((r: any) => ({
+      id: r.id,
+      label: customerLabel(r),
+      email: r.email,
+      balance: toInt(r.balance),
+      balanceText: pointText(r.balance),
+      lastActivityText: r.last_at ? fmtMdHm(r.last_at) : null,
+    })),
+    message: rows.length === 0 ? "찾는 고객이 없어요." : null,
+  };
+}

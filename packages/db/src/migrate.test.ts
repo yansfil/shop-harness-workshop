@@ -29,6 +29,7 @@ describe("migrate", () => {
     );
     expect(tables).toEqual([
       "announcements",
+      "batch_job_settings",
       "batch_run_logs",
       "batch_runs",
       "categories",

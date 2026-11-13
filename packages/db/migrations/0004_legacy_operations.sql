@@ -78,3 +78,11 @@ CREATE TABLE order_address_changes (
   created_at      TEXT    NOT NULL
 );
 CREATE INDEX order_address_changes_order ON order_address_changes (order_id);
+
+CREATE TABLE batch_job_settings (
+  job_name   TEXT PRIMARY KEY,
+  paused_at  TEXT,
+  paused_by  INTEGER REFERENCES users (id),
+  memo       TEXT,
+  updated_at TEXT NOT NULL
+);

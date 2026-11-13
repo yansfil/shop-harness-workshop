@@ -46,6 +46,22 @@ export function registerSettlementReportRoutes(router: Router): void {
     }),
   );
 
+  router.post(
+    "/api/admin/settlements/close/:day",
+    wrap((req, res) => {
+      mustAdmin(res);
+      ok(res, reports.recloseDay(req.params.day));
+    }),
+  );
+
+  router.get(
+    "/api/admin/settlements/compare",
+    wrap((_req, res) => {
+      mustAdmin(res);
+      ok(res, reports.monthComparison());
+    }),
+  );
+
   router.get(
     "/api/admin/settlements/payouts",
     wrap((req, res) => {

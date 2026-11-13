@@ -104,3 +104,14 @@ export function trimOld(job: string, keep: number): number {
     ).changes,
   );
 }
+
+export function jobSettings(): any {
+  const out: any = {};
+  for (const r of all("SELECT s.*, u.name AS paused_by_name FROM batch_job_settings s LEFT JOIN users u ON u.id = s.paused_by")) out[r.job_name] = r;
+  return out;
+}
+
+export function setPaused(job: string, pausedAt: string | null, adminId: any, memo: string | null, atIso: string): void {
+  run("DELETE FROM batch_job_settings WHERE job_name = ?", job);
+  insert("batch_job_settings", { job_name: job, paused_at: pausedAt, paused_by: pausedAt ? adminId : null, memo: memo, updated_at: atIso });
+}

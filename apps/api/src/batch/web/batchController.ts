@@ -1,7 +1,7 @@
 // 배치 API
 import type { Router } from "express";
-import { BATCH_JOBS, mustAdmin, mustOneOf, ok, queryStr, wrap } from "../../legacy/legacyUtils.ts";
-import { healthSummary, history, runJob, runLogs } from "../batchRunner.ts";
+import { BATCH_JOBS, bodyOf, mustAdmin, mustOneOf, ok, queryStr, wrap } from "../../legacy/legacyUtils.ts";
+import { healthSummary, history, runJob, runLogs, setJobPaused } from "../batchRunner.ts";
 
 export function registerBatchRoutes(router: Router): void {
   router.get(
@@ -26,6 +26,22 @@ export function registerBatchRoutes(router: Router): void {
     wrap((req, res) => {
       mustAdmin(res);
       ok(res, runLogs(req.params.runId));
+    }),
+  );
+
+  router.post(
+    "/api/admin/batch-jobs/:job/pause",
+    wrap((req, res) => {
+      const admin = mustAdmin(res);
+      ok(res, setJobPaused(admin, String(req.params.job), true, bodyOf(req).memo));
+    }),
+  );
+
+  router.post(
+    "/api/admin/batch-jobs/:job/resume",
+    wrap((req, res) => {
+      const admin = mustAdmin(res);
+      ok(res, setJobPaused(admin, String(req.params.job), false, null));
     }),
   );
 

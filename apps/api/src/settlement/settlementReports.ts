@@ -30,6 +30,7 @@ import {
 } from "../legacy/legacyUtils.ts";
 import * as reportQueries from "./infra/reportQueries.ts";
 import { closedDays } from "./infra/settlementQueries.ts";
+import { closeDay, monthly } from "./settlementService.ts";
 
 const MAX_DAYS = 120;
 const PAYOUT_BUSINESS_DAYS = 2;
@@ -307,4 +308,49 @@ export function payoutsCsv(fromInput: any, toInput: any): any {
 
 export function describeAdjustment(a: any): string {
   return fmtMd(a.day) + " " + (a.amount > 0 ? "+" : "") + comma(a.amount) + "원 " + str(a.reason);
+}
+
+/* 다시 마감·달 비교 ------------------------------------------------------ */
+
+/** 관리자가 하루를 다시 마감한다(늦게 들어온 취소·반품을 반영할 때). 오늘과 앞날은 안 된다 */
+export function recloseDay(dayInput: any): any {
+  const day = trim(dayInput);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || !isValidDate(day)) throw badRequest("날짜가 올바르지 않습니다.");
+  if (day >= ymd(now())) throw conflict("DAY_NOT_OVER", "오늘과 앞날은 마감할 수 없어요.");
+  const before = closedDays(day, day)[0] || null;
+  const result = closeDay(day, null);
+  log("settlement_day_reclosed", { day: day });
+  return {
+    day: day,
+    dayText: fmtMdWeek(day),
+    before: before ? Math.round(Number(before.net_amount)) : null,
+    after: result.netAmount,
+    difference: before ? result.netAmount - Math.round(Number(before.net_amount)) : null,
+    orderCount: result.orderCount,
+  };
+}
+
+/** 달마다 앞 달·작년 같은 달과 비교 */
+export function monthComparison(): any {
+  const report = monthly("");
+  const byMonth: any = {};
+  for (const r of report.rows) byMonth[r.month] = r;
+  const rows = report.rows.map((r: any) => {
+    const y = Number(r.month.slice(0, 4));
+    const m = Number(r.month.slice(5, 7));
+    const prevKey = m === 1 ? y - 1 + "-12" : y + "-" + (m - 1 < 10 ? "0" : "") + (m - 1);
+    const lastYearKey = y - 1 + r.month.slice(4);
+    const prev = byMonth[prevKey];
+    const lastYear = byMonth[lastYearKey];
+    return {
+      month: r.month,
+      label: r.label,
+      orderCount: r.orderCount,
+      netAmount: r.netAmount,
+      averageOrder: r.orderCount > 0 ? Math.round(r.netAmount / r.orderCount) : 0,
+      vsPrevText: prev ? changeText(r.netAmount, prev.netAmount) : "-",
+      vsLastYearText: lastYear ? changeText(r.netAmount, lastYear.netAmount) : "-",
+    };
+  });
+  return { rows: rows, periodText: report.periodText };
 }

@@ -61,6 +61,36 @@ function deliver(q: any, payload: any): void {
   if (Number(q.id) % 13 === 0 && !payload.manualRetry) throw new Error("알림 서버가 응답하지 않았어요");
 }
 
+/** 알림 한 건 보내기. 보냈으면 true, 실패하면 다음 시도를 잡고 false */
+function sendOne(q: any, when: string): boolean {
+  const payload = safeJson(q.payload);
+  try {
+    deliver(q, payload);
+    tx(() => {
+      const n = render(q.type, payload);
+      const notificationId = dao.insertNotification({
+        user_id: q.user_id,
+        type: q.type,
+        title: n.title,
+        body: n.body,
+        link: n.link,
+        read_at: null,
+        created_at: when,
+      });
+      dao.markSent(q.id, notificationId, when);
+    });
+    STATE.sentCount++;
+    return true;
+  } catch (e: any) {
+    const attempts = Number(q.attempts) + 1;
+    const finalFail = attempts >= CONFIG.NOTIFY_MAX_ATTEMPTS;
+    dao.markAttemptFailed(q.id, e && e.message ? e.message : String(e), addMinutes(when, attempts * 5).toISOString(), finalFail);
+    STATE.failedCount++;
+    if (finalFail) logError("notification_failed", e, { queueId: q.id, type: q.type });
+    return false;
+  }
+}
+
 /** 보낼 때가 된 알림을 보낸다 */
 export function processDue(limit?: number, atIso?: string): any {
   const when = atIso || nowIso();
@@ -68,32 +98,8 @@ export function processDue(limit?: number, atIso?: string): any {
   let sent = 0;
   let failed = 0;
   for (const q of rows) {
-    const payload = safeJson(q.payload);
-    try {
-      deliver(q, payload);
-      tx(() => {
-        const n = render(q.type, payload);
-        const notificationId = dao.insertNotification({
-          user_id: q.user_id,
-          type: q.type,
-          title: n.title,
-          body: n.body,
-          link: n.link,
-          read_at: null,
-          created_at: when,
-        });
-        dao.markSent(q.id, notificationId, when);
-      });
-      sent++;
-      STATE.sentCount++;
-    } catch (e: any) {
-      const attempts = Number(q.attempts) + 1;
-      const finalFail = attempts >= CONFIG.NOTIFY_MAX_ATTEMPTS;
-      dao.markAttemptFailed(q.id, e && e.message ? e.message : String(e), addMinutes(when, attempts * 5).toISOString(), finalFail);
-      failed++;
-      STATE.failedCount++;
-      if (finalFail) logError("notification_failed", e, { queueId: q.id, type: q.type });
-    }
+    if (sendOne(q, when)) sent++;
+    else failed++;
   }
   if (rows.length > 0) log("notification_queue_processed", { picked: rows.length, sent: sent, failed: failed });
   return { picked: rows.length, sent: sent, failed: failed };
@@ -106,23 +112,24 @@ export function retry(queueId: any): any {
   if (q.state !== "failed") throw badRequest("실패한 알림만 다시 보낼 수 있어요.");
   const payload = safeJson(q.payload);
   payload.manualRetry = true;
+  const at = nowIso();
   tx(() => {
-    dao.resetForRetry(q.id, nowIso());
+    dao.resetForRetry(q.id, at);
     dao.updatePayload(q.id, JSON.stringify(payload));
   });
-  const result = processDue(CONFIG.NOTIFY_BATCH_SIZE);
+  sendOne(dao.findQueue(q.id), at);
   const after = dao.findQueue(queueId);
-  return { id: q.id, state: after ? after.state : q.state, processed: result };
+  return { id: q.id, state: after ? after.state : q.state };
 }
 
 /** 관리자 대기열 화면 */
 export function adminList(tab: string): any {
-  const states = tab === "sent" ? ["sent"] : ["pending", "failed"];
+  const states = tab === "sent" ? ["sent", "cancelled"] : ["pending", "failed"];
   const rows = dao.listQueue(states, tab === "sent" ? 300 : 500);
   const counts = dao.countQueue();
   return {
     tab: tab === "sent" ? "sent" : "waiting",
-    counts: { waiting: counts.pending + counts.failed, pending: counts.pending, failed: counts.failed, sent: counts.sent },
+    counts: { waiting: counts.pending + counts.failed, pending: counts.pending, failed: counts.failed, sent: counts.sent, cancelled: counts.cancelled },
     items: rows.map((q: any) => {
       const payload = safeJson(q.payload);
       return {

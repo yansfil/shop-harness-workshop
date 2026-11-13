@@ -103,3 +103,20 @@ export function shipmentsBetween(fromIso: string, toIso: string): any[] {
     toIso,
   );
 }
+
+/** 고객 한 명의 송장 (최근 순) */
+export function shipmentsOfCustomer(userId: any, limit: number): any[] {
+  return all(
+    "SELECT s.*, o.order_number, o.status, o.created_at AS ordered_at FROM shipments s JOIN orders o ON o.id = s.order_id WHERE o.customer_id = ? ORDER BY s.registered_at DESC, s.id DESC LIMIT ?",
+    Number(userId),
+    limit,
+  );
+}
+
+/** 송장이 아직 없는 내 주문 (결제완료·배송준비) */
+export function unshippedOfCustomer(userId: any): any[] {
+  return all(
+    "SELECT o.id, o.order_number, o.status, o.created_at FROM orders o LEFT JOIN shipments s ON s.order_id = o.id WHERE o.customer_id = ? AND o.status IN ('paid', 'preparing') AND s.id IS NULL ORDER BY o.created_at DESC",
+    Number(userId),
+  );
+}

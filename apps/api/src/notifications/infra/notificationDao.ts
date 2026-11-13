@@ -26,7 +26,7 @@ export function listQueue(states: string[], limit: number): any[] {
 
 export function countQueue(): any {
   const rows = all("SELECT state, COUNT(*) AS n FROM notification_queue GROUP BY state");
-  const out: any = { pending: 0, sent: 0, failed: 0 };
+  const out: any = { pending: 0, sent: 0, failed: 0, cancelled: 0 };
   for (const r of rows) out[r.state] = Number(r.n);
   return out;
 }
@@ -81,4 +81,16 @@ export function markAllRead(userId: any, atIso: string): number {
 export function userHasLogin(userId: any): boolean {
   const row = one("SELECT password_hash FROM users WHERE id = ?", Number(userId));
   return !!row && row.password_hash != null;
+}
+
+export function cancelQueue(id: any, atIso: string): number {
+  return Number(run("UPDATE notification_queue SET state = 'cancelled', last_error = '관리자가 보내지 않기로 했어요', sent_at = ? WHERE id = ? AND state IN ('pending', 'failed')", atIso, Number(id)).changes);
+}
+
+export function failedIds(limit: number): number[] {
+  return all("SELECT id FROM notification_queue WHERE state = 'failed' ORDER BY id LIMIT ?", limit).map((r: any) => Number(r.id));
+}
+
+export function countByTypeSince(sinceIso: string): any[] {
+  return all("SELECT type, state, COUNT(*) AS n FROM notification_queue WHERE created_at >= ? GROUP BY type, state", sinceIso);
 }

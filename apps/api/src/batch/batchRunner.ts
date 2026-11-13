@@ -86,6 +86,7 @@ export function history(job: string | null): any {
       .filter((k) => BATCH_JOBS[k].time)
       .map((k) => ({ job: k, name: BATCH_JOBS[k].name, time: BATCH_JOBS[k].time })),
     jobs: Object.keys(BATCH_JOBS).map((k) => ({ job: k, name: BATCH_JOBS[k].name })),
+    jobStates: jobStates(),
     runs: rows.map((r: any) => ({
       id: r.id,
       job: r.job_name,
@@ -110,8 +111,10 @@ export function history(job: string | null): any {
 export function runDue(): any[] {
   const results: any[] = [];
   const current = now();
+  const settings = dao.jobSettings();
   for (const job of Object.keys(BATCH_JOBS)) {
     const time = BATCH_JOBS[job].time;
+    if (settings[job] && settings[job].paused_at) continue;
     try {
       if (!time) {
         results.push(runJob(job, "schedule"));
@@ -159,6 +162,7 @@ export function runLogs(idInput: any): any {
 /** 작업별 최근 30일 성공률 */
 export function healthSummary(): any {
   const since = addDays(now(), -30).toISOString();
+  const states = jobStates();
   const byJob: any = {};
   for (const r of dao.stateCounts(since)) {
     if (!byJob[r.job_name]) byJob[r.job_name] = { success: 0, failed: 0, skipped: 0, running: 0 };
@@ -176,8 +180,41 @@ export function healthSummary(): any {
         failed: c.failed,
         skipped: c.skipped,
         lastState: last ? last.state : null,
+        paused: !!(states[k] && states[k].paused),
         lastStartedAtText: last ? fmtMdHm(last.started_at) : null,
       };
     }),
   };
+}
+
+/** 자동 실행 멈추기·다시 켜기 (지금 실행 버튼은 멈춰도 쓸 수 있다) */
+export function setJobPaused(admin: any, job: string, paused: boolean, memoInput: any): any {
+  if (!BATCH_JOBS[job]) throw badRequest("없는 배치예요.");
+  const settings = dao.jobSettings();
+  const now0 = nowIso();
+  const isPaused = !!(settings[job] && settings[job].paused_at);
+  if (paused && isPaused) throw conflict("BATCH_ALREADY_PAUSED", batchJobName(job) + " 자동 실행은 이미 멈춰 있어요.");
+  if (!paused && !isPaused) throw conflict("BATCH_NOT_PAUSED", batchJobName(job) + " 자동 실행은 멈춰 있지 않아요.");
+  const memoText = memoInput == null ? null : String(memoInput).trim().slice(0, 100) || null;
+  dao.setPaused(job, paused ? now0 : null, admin.id, paused ? memoText : null, now0);
+  log(paused ? "batch_paused" : "batch_resumed", { job: job });
+  return jobStates()[job];
+}
+
+export function jobStates(): any {
+  const settings = dao.jobSettings();
+  const out: any = {};
+  for (const k of Object.keys(BATCH_JOBS)) {
+    const s = settings[k];
+    out[k] = {
+      job: k,
+      name: BATCH_JOBS[k].name,
+      time: BATCH_JOBS[k].time,
+      paused: !!(s && s.paused_at),
+      pausedAtText: s && s.paused_at ? fmtMdHm(s.paused_at) : null,
+      pausedBy: s && s.paused_at ? s.paused_by_name : null,
+      memo: s ? s.memo : null,
+    };
+  }
+  return out;
 }
