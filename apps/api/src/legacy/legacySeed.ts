@@ -323,13 +323,13 @@ export function seedLegacyData(db: any, services: any, baseDate: Date): void {
     for (const i of shipping.concat(couponNotice)) unread[i] = true;
   }
 
-  let failedPlanted = 0;
+  let failedSeeded = 0;
   notices.forEach((n, index) => {
     const at = new Date(Math.min(n.at, base - MINUTE)).toISOString();
     const text = render(n.type, n.payload);
-    const isFailed = failedPlanted < 2 && index % 97 === 13 && demoIds.indexOf(n.userId) < 0 && n.at > base - 2 * DAY;
+    const isFailed = failedSeeded < 2 && index % 97 === 13 && demoIds.indexOf(n.userId) < 0 && n.at > base - 2 * DAY;
     if (isFailed) {
-      failedPlanted++;
+      failedSeeded++;
       insQueue.run(n.userId, n.type, JSON.stringify(n.payload), at, 3, "failed", "알림 서버가 응답하지 않았어요", null, null, at);
       return;
     }
