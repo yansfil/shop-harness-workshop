@@ -12,6 +12,8 @@ import { StatusBadge } from "../components/status-badge.tsx";
 import { krw } from "../lib/format.ts";
 import { formatShortTime } from "../lib/format.ts";
 import { NotFoundError } from "../lib/not-found.ts";
+import { signedKrw, wonText } from "../legacy/money.ts";
+import { type PaidInfo, myPayments } from "../legacy/payments.ts";
 
 export function summarize(order: Pick<OrderSummary, "firstItemName" | "itemCount">): string {
   return order.itemCount > 1 ? `${order.firstItemName} 외 ${order.itemCount - 1}건` : order.firstItemName;
@@ -20,7 +22,7 @@ export function summarize(order: Pick<OrderSummary, "firstItemName" | "itemCount
 // ---- 내 주문 목록 ----
 
 export function myOrdersLoader() {
-  return { result: streamed(callApi("listMyOrders")) };
+  return { result: streamed(Promise.all([callApi("listMyOrders"), myPayments()]).then(([list, paid]) => ({ orders: list.orders, paid }))) };
 }
 
 export function MyOrdersPage() {
@@ -41,7 +43,7 @@ export function MyOrdersPage() {
           </>
         }
       >
-        {({ orders }) => (
+        {({ orders, paid }) => (
           <>
             <Heading count={orders.length} />
             {orders.length === 0 ? (
@@ -53,7 +55,7 @@ export function MyOrdersPage() {
                 </EmptyState>
               </div>
             ) : (
-              <OrderList orders={orders} />
+              <OrderList orders={orders} paid={paid} />
             )}
           </>
         )}
@@ -73,7 +75,7 @@ function Heading({ count }: { count?: number }) {
 
 const listGrid = "md:grid md:grid-cols-[8rem_9rem_minmax(0,1fr)_8rem_6rem_2rem] md:items-center md:gap-x-4";
 
-function OrderList({ orders }: { orders: OrderSummary[] }) {
+function OrderList({ orders, paid }: { orders: OrderSummary[]; paid: Map<number, PaidInfo> }) {
   return (
     <div className="rounded-md border border-line bg-ground">
       <div className={`${listGrid} hidden h-10 border-b border-line px-6 text-xs-plus text-ink-3 md:grid`}>
@@ -91,7 +93,7 @@ function OrderList({ orders }: { orders: OrderSummary[] }) {
               <span className="text-sm font-extrabold text-ink md:text-sm">{order.orderNumber}</span>
               <span className="order-last w-full text-xs-plus text-ink-3 md:order-none md:w-auto md:text-sm">{formatShortTime(order.createdAt)}</span>
               <span className="order-last w-full truncate text-sm text-ink md:order-none md:w-auto">{summarize(order)}</span>
-              <span className="text-sm font-extrabold text-ink md:text-right">{krw(order.total)}</span>
+              <span className="text-sm font-extrabold text-ink md:text-right">{wonText(paid.get(order.id)?.paidAmount ?? order.total)}</span>
               <span className="max-md:order-2">
                 <StatusBadge status={order.status} />
               </span>
@@ -109,7 +111,10 @@ function OrderList({ orders }: { orders: OrderSummary[] }) {
 export function myOrderLoader({ params }: LoaderFunctionArgs) {
   const parsed = OrderParamsSchema.safeParse(params);
   if (!parsed.success) throw new NotFoundError("찾을 수 없는 주문입니다");
-  return { result: streamed(callApi("getMyOrder", { params: { orderId: parsed.data.orderId } })) };
+  const orderId = parsed.data.orderId;
+  return {
+    result: streamed(Promise.all([callApi("getMyOrder", { params: { orderId } }), myPayments()]).then(([found, paid]) => ({ order: found.order, payment: paid.get(orderId) ?? null }))),
+  };
 }
 
 const orderNotFound = (
@@ -133,7 +138,7 @@ export function OrderCompletePage() {
   return (
     <Page>
       <Loaded resolve={result} failure="주문을 불러오지 못했어요" skeleton={detailSkeleton} notFound={orderNotFound}>
-        {({ order }) => (
+        {({ order, payment }) => (
           <div className="mx-auto max-w-180">
             <div className="flex flex-col items-center text-center">
               <span className="flex size-14 items-center justify-center rounded-pill bg-accent text-ink">
@@ -163,9 +168,15 @@ export function OrderCompletePage() {
                     {krw(order.subtotal)} + {krw(order.shippingFee)}
                   </dd>
                 </div>
+                {payment !== null && payment.couponDiscount + payment.pointUsed !== 0 && (
+                  <div className="flex h-11 items-center justify-between border-b border-line px-4 md:px-6">
+                    <dt className="text-ink-3">쿠폰·포인트 할인</dt>
+                    <dd className="font-semibold text-ink">{signedKrw(-(payment.couponDiscount + payment.pointUsed))}</dd>
+                  </div>
+                )}
                 <div className="flex h-16 items-center justify-between px-4 md:px-6">
                   <dt className="font-bold text-ink">결제 금액</dt>
-                  <dd className="text-xl font-extrabold text-ink">{krw(order.total)}</dd>
+                  <dd className="text-xl font-extrabold text-ink">{wonText(payment?.paidAmount ?? order.total)}</dd>
                 </div>
               </dl>
             </div>
