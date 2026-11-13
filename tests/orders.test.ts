@@ -1,4 +1,4 @@
-import { AdminOrderListResponseSchema, AdminOrderResponseSchema, ApiErrorResponseSchema, MyOrderListResponseSchema, OrderQuoteResponseSchema, OrderResponseSchema, ROUTES, buildPath } from "@grabmarket/contracts";
+import { AdminOrderListResponseSchema, AdminOrderResponseSchema, ApiErrorResponseSchema, MyOrderListResponseSchema, MyOrderResponseSchema, OrderQuoteResponseSchema, OrderResponseSchema, ROUTES, buildPath } from "@grabmarket/contracts";
 import request from "supertest";
 import { describe, expect, it } from "vitest";
 import { ACCOUNT, createTestApp, loginAs, orderBody, PRODUCT } from "./support/test-app.ts";
@@ -102,7 +102,10 @@ describe("내 주문", () => {
     const { order } = OrderResponseSchema.parse((await customerA.post(ROUTES.orders).send(orderBody([{ productId: PRODUCT.socks, quantity: 1 }]))).body);
     const path = buildPath(ROUTES.order, { orderId: order.id });
 
-    expect(OrderResponseSchema.parse((await customerA.get(path).expect(200)).body).order.id).toBe(order.id);
+    const mine = MyOrderResponseSchema.parse((await customerA.get(path).expect(200)).body).order;
+    expect(mine.id).toBe(order.id);
+    expect(Number.isInteger(mine.elapsedDays)).toBe(true);
+    expect(mine.elapsedDays).toBeGreaterThanOrEqual(0);
     const others = await customerB.get(path).expect(404);
     expect(ApiErrorResponseSchema.parse(others.body).error.code).toBe("NOT_FOUND");
     await request(app).get(path).expect(401);
