@@ -16,7 +16,7 @@ export function Logo({ className = "" }: { className?: string }) {
 
 /**
  * 고객 화면 머리: 로고·큰 검색창·내 주문·장바구니. 카테고리 줄은 데스크톱에서 항상, 모바일(375px)에서는 mobileCategories가 켜진
- * 화면(홈·카테고리·검색 결과)에만 둔다(D-46).
+ * 화면(홈·카테고리·검색 결과)에만 둔다.
  */
 export function SiteHeader({ mobileCategories }: { mobileCategories: boolean }) {
   const { user, categories } = useRootData();

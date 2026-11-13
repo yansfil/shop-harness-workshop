@@ -3,6 +3,8 @@ name: ci
 on:
   push:
   pull_request:
+  # 손으로 다시 돌릴 때(Actions 탭의 Run workflow)
+  workflow_dispatch:
 
 jobs:
   verify:
