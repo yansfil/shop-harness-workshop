@@ -20,8 +20,10 @@ export const CLAUDE_INSTALL_HELP = [
   "설치한 뒤 터미널을 새로 열고 claude --version이 되는지 확인하세요.",
 ];
 
+/** 레포 안이면 레포 기준 경로, 밖이면 전체 경로. */
 function relative(file: string): string {
-  return path.relative(REPO_ROOT, file) || ".";
+  const inside = path.relative(REPO_ROOT, file);
+  return inside === "" || inside.startsWith("..") || path.isAbsolute(inside) ? file : inside;
 }
 
 /** PATH에서 claude를 찾고 --version으로 실행되는지 본다. 찾은 경로를 돌려준다. */
