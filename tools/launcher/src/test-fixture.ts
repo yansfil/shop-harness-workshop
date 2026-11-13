@@ -5,8 +5,20 @@ import { createHash } from "node:crypto";
 import { chmodSync, copyFileSync, cpSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync, existsSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import { findCommand, findHere } from "./command.ts";
 import { REPO_ROOT } from "./paths.ts";
+import type { Platform } from "./dependencies.ts";
+
+/**
+ * 테스트가 "이 컴퓨터"로 치는 OS·CPU. LAUNCHER_SIMULATE_PLATFORM=<os>-<cpu>이면 그 값(start.mjs 자식의 의존성 판정도 같은 값을 본다).
+ * 예: LAUNCHER_SIMULATE_PLATFORM=linux-x64 npx vitest run tools/launcher
+ */
+export const TEST_PLATFORM: Platform = (() => {
+  const [os, cpu] = (process.env.LAUNCHER_SIMULATE_PLATFORM ?? "").split("-");
+  return os !== undefined && cpu !== undefined ? { os, cpu } : { os: process.platform, cpu: process.arch };
+})();
+const SIMULATE_PLATFORM_FILE = path.join(import.meta.dirname, "simulate-platform.ts");
 
 const REPO_FILES = [
   "start.mjs",
@@ -111,7 +123,7 @@ function hiddenLockFrom(lock: LockFile): LockFile {
   for (const [location, entry] of Object.entries(lock.packages)) {
     if (location === "") continue;
     if (entry.optional !== true) packages[location] = entry;
-    else if (Array.isArray(entry.os) && entry.os.includes(process.platform) && (entry.cpu === undefined || (Array.isArray(entry.cpu) && entry.cpu.includes(process.arch)))) packages[location] = entry;
+    else if (Array.isArray(entry.os) && entry.os.includes(TEST_PLATFORM.os) && (entry.cpu === undefined || (Array.isArray(entry.cpu) && entry.cpu.includes(TEST_PLATFORM.cpu)))) packages[location] = entry;
   }
   return { ...lock, packages };
 }
@@ -191,6 +203,9 @@ export function createFixture(options: { claude?: boolean; hook?: boolean; git?:
 
   const env: NodeJS.ProcessEnv = { ...process.env, HOME: home, USERPROFILE: home, DATABASE_PATH: databaseFile, FAKE_CLAUDE_LOG: claudeLogFile, FAKE_NPM_LOG: npmLogFile, FAKE_NPM_HIDDEN_LOCK: goodHiddenLock };
   delete env.CLAUDE_CONFIG_DIR;
+  if (process.env.LAUNCHER_SIMULATE_PLATFORM !== undefined && process.env.LAUNCHER_SIMULATE_PLATFORM !== "") {
+    env.NODE_OPTIONS = `${env.NODE_OPTIONS ?? ""} --import ${pathToFileURL(SIMULATE_PLATFORM_FILE).href}`.trim();
+  }
   // 진짜 claude·npm이 보이지 않도록 PATH에는 가짜 claude·npm 폴더와 git 폴더만 둔다.
   setPath(env, [bin, path.dirname(git)].join(path.delimiter));
 

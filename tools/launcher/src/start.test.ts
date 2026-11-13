@@ -4,7 +4,8 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import { REPO_ROOT } from "./paths.ts";
-import { createFixture, originalClaudeState, type Fixture } from "./test-fixture.ts";
+import { hasReleaseFile } from "./dependencies.ts";
+import { createFixture, originalClaudeState, TEST_PLATFORM, type Fixture } from "./test-fixture.ts";
 
 let fixture: Fixture | null = null;
 afterEach(() => {
@@ -94,7 +95,7 @@ describe("node start.mjs", () => {
     it("이 컴퓨터에 설치되지 않는 optional 바이너리가 숨은 lock에 없어도 설치된 것으로 본다", () => {
       fixture = createFixture();
       const lock = fixture.readLock();
-      const skipped = Object.entries(lock.packages).filter(([, entry]) => entry.optional === true && Array.isArray(entry.os) && !entry.os.includes(process.platform));
+      const skipped = Object.entries(lock.packages).filter(([, entry]) => entry.optional === true && Array.isArray(entry.os) && !entry.os.includes(TEST_PLATFORM.os));
       expect(skipped.length).toBeGreaterThan(0);
       const installed = fixture.readHiddenLock().packages;
       expect(skipped.every(([location]) => !(location in installed))).toBe(true);
@@ -128,8 +129,8 @@ describe("node start.mjs", () => {
         entry.libc === undefined &&
         Array.isArray(entry.os) &&
         Array.isArray(entry.cpu) &&
-        entry.os.includes(process.platform) &&
-        entry.cpu.includes(process.arch),
+        entry.os.includes(TEST_PLATFORM.os) &&
+        entry.cpu.includes(TEST_PLATFORM.cpu),
     )?.[0];
     it.skipIf(hereBinary === undefined)("이 컴퓨터용 optional 바이너리가 빠진 node_modules(다른 OS·CPU용 압축 파일)는 npm ci를 부른다", () => {
       fixture = createFixture();
@@ -182,7 +183,7 @@ describe("node start.mjs", () => {
       expect(links).toEqual([]);
     });
 
-    it("npm ci가 실패하면 압축 파일 안내와 함께 그 단계에서 멈춘다", () => {
+    it("npm ci가 실패하면 그 컴퓨터에 맞는 안내(Release 파일이 있으면 링크, 없으면 없다는 말)와 함께 그 단계에서 멈춘다", () => {
       fixture = createFixture();
       rmSync(fixture.hiddenLockFile);
       fixture.env.FAKE_NPM_EXIT = "1";
@@ -190,7 +191,8 @@ describe("node start.mjs", () => {
 
       expect(result.status).not.toBe(0);
       expect(result.stderr).toContain("[4/7] 의존성: 실패");
-      expect(result.stderr).toContain("https://github.com/yansfil/shop-harness-workshop/releases");
+      if (hasReleaseFile(TEST_PLATFORM)) expect(result.stderr).toContain("https://github.com/yansfil/shop-harness-workshop/releases");
+      else expect(result.stderr).toContain("이 컴퓨터용 압축 파일은 없습니다");
       expect(result.stdout + result.stderr).not.toContain("[5/7]");
     });
   });
