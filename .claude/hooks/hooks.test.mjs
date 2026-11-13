@@ -1,4 +1,5 @@
-// Hook 판정 함수의 테스트. 어떤 명령·경로가 막히고 어떤 것이 통과하는지를 표로 확인한다.
+// Hook 판정 함수의 테스트. 판정 범위는 README.md에 있고, 그 범위를 아래 '막는다'·'통과한다' 표로 고정한다.
+// 표의 출처: 리뷰1(3acdb3d 리뷰), 재리뷰1(36b6ef4 재리뷰), 재리뷰2(그 재리뷰의 인접 입력과 고치기 지시).
 import { spawnSync } from "node:child_process";
 import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
 import os from "node:os";
@@ -11,6 +12,7 @@ import { decide as stopVerify } from "./stop-verify.mjs";
 
 const { lintTarget } = lintSavedFile;
 const bash = (command) => ({ tool_name: "Bash", tool_input: { command } });
+const file = (tool_name, file_path) => ({ tool_name, tool_input: { file_path } });
 const denied = (output) => output?.hookSpecificOutput?.permissionDecision === "deny";
 
 /** 커밋 하나가 있는 임시 git 저장소. 끝나면 지운다. */
@@ -35,118 +37,255 @@ function tempRepo(files) {
   return { dir, git, write: (name, text) => writeFileSync(path.join(dir, name), text) };
 }
 
-describe("guard-bash", () => {
-  it.each([
-    "git push --force origin main",
-    "git push -f",
-    "git push origin main --force-with-lease",
-    "git -C ../repo push origin +main",
-    "git status && git push -fu origin feature",
-    "rm -rf /",
-    "rm -rf .",
-    "rm -rf apps/api",
-    "rm -r *",
-    "git clean -fd",
-    "find . -name '*.ts' -delete",
-    // R3: 실행 접두어·이어 붙인 명령·서브셸을 펼쳐서 본다.
-    "env git push -f",
-    "command git push -f",
-    "CI=1 git push -f",
-    "sudo git push --force origin main",
-    "env rm -rf docs/tasks",
-    "sudo -u root rm -rf apps",
-    "(cd docs && rm -rf tasks)",
-    "nohup git push -f &",
-    "timeout 30 git push -f",
-    "/usr/bin/git push -f",
-    "git.exe push -f",
-    'bash -c "git push -f"',
-    "sh -c 'rm -rf apps/api'",
-    'eval "git push -f"',
-    "echo $(git push -f)",
-    "ls | xargs rm -rf",
-    "find . -name '*.ts' -exec rm -rf {} \\;",
-  ])("막는다: %s", (command) => {
-    expect(denied(guardBash(bash(command)))).toBe(true);
-  });
+// 가짜 프로젝트: /work/shop, HEAD에 있는 마이그레이션은 0001_init.sql 하나.
+const CWD = "/work/shop";
+const COMMITTED = ["packages/db/migrations/0001_init.sql"];
+const committed = (relative) => COMMITTED.some((entry) => entry === relative || entry.startsWith(`${relative}/`));
+const HOOKS = {
+  "guard-bash": (payload) => guardBash({ cwd: CWD, ...payload }),
+  "protect-files": (payload) => protectFiles(payload, CWD, committed),
+};
 
-  it.each([
-    "git push origin feature",
-    "git push -u origin feature",
-    'git commit -m "force push 금지 문서 추가"',
-    "git commit -m \"git push -f 설명\"",
-    'git commit -m "env git push -f 막기"',
-    "rm -rf node_modules",
-    "rm -rf dist node_modules",
-    "rm dist/old.js",
-    "rm -f tmp.txt",
-    "npm run verify",
-    "env FOO=1 npm run verify",
-    'echo "rm -rf apps"',
-  ])("통과시킨다: %s", (command) => {
-    expect(guardBash(bash(command))).toBeNull();
+// [Hook, 입력, 출처]. 출처가 비어 있으면 처음부터 있던 기본 사례.
+const BLOCKED = [
+  // force push
+  ["guard-bash", bash("git push --force origin main"), ""],
+  ["guard-bash", bash("git push -f"), "리뷰1"],
+  ["guard-bash", bash("git push --force-with-lease"), "리뷰1"],
+  ["guard-bash", bash("git push origin main --force-with-lease"), ""],
+  ["guard-bash", bash("git -C ../repo push origin +main"), ""],
+  ["guard-bash", bash("git status && git push -fu origin feature"), ""],
+  ["guard-bash", bash("env git push -f"), "리뷰1"],
+  ["guard-bash", bash("command git push -f"), "리뷰1"],
+  ["guard-bash", bash("CI=1 git push -f"), "리뷰1"],
+  ["guard-bash", bash("sudo git push --force origin main"), "재리뷰1"],
+  ["guard-bash", bash("nohup git push -f &"), "재리뷰1"],
+  ["guard-bash", bash("timeout 10 git push -f"), "재리뷰1"],
+  ["guard-bash", bash("/usr/bin/git push -f"), ""],
+  ["guard-bash", bash("git.exe push -f"), ""],
+  ["guard-bash", bash('bash -c "git push -f"'), "재리뷰1"],
+  ["guard-bash", bash('eval "git push -f"'), "재리뷰1"],
+  ["guard-bash", bash("echo $(git push -f)"), "재리뷰1"],
+  ["guard-bash", bash("git -C . push -f"), "재리뷰1"],
+  // 값을 받는 옵션 뒤의 실제 명령(재리뷰2 F1)
+  ["guard-bash", bash("sudo --user root git push -f"), "재리뷰2"],
+  ["guard-bash", bash("sudo --user=root git push -f"), "재리뷰2"],
+  ["guard-bash", bash("sudo -u deploy git push -f"), "재리뷰2"],
+  ["guard-bash", bash("sudo -Eu deploy git push --force"), "재리뷰2"],
+  ["guard-bash", bash("sudo --chdir /tmp --user root git push -f"), "재리뷰2"],
+  ["guard-bash", bash("git --git-dir .git push -f"), "재리뷰2"],
+  ["guard-bash", bash("git --work-tree . push --force"), "재리뷰2"],
+  ["guard-bash", bash("git --work-tree=. push --force"), "재리뷰2"],
+  ["guard-bash", bash("git -C apps push --force"), "재리뷰2"],
+  ["guard-bash", bash("git -c core.pager=cat push -f"), "재리뷰2"],
+  ["guard-bash", bash("git -c user.name=x -C . --no-pager push --force origin main"), "재리뷰2"],
+  ["guard-bash", bash("env -u HOME git push -f"), "재리뷰2"],
+  ["guard-bash", bash("timeout --signal KILL 30 git push -f"), "재리뷰2"],
+  // 대량 삭제
+  ["guard-bash", bash("rm -rf /"), ""],
+  ["guard-bash", bash("rm -rf ."), ""],
+  ["guard-bash", bash("rm -rf apps/api"), ""],
+  ["guard-bash", bash("rm -rf docs/tasks apps/api"), "리뷰1"],
+  ["guard-bash", bash("rm -rf dist docs/tasks"), "리뷰1"],
+  ["guard-bash", bash("rm -r *"), ""],
+  ["guard-bash", bash("git clean -fd"), ""],
+  ["guard-bash", bash("find . -name '*.ts' -delete"), ""],
+  ["guard-bash", bash("env rm -rf docs/tasks"), "리뷰1"],
+  ["guard-bash", bash("sudo -u root rm -rf apps"), ""],
+  ["guard-bash", bash("(cd docs && rm -rf tasks)"), ""],
+  ["guard-bash", bash("sh -c 'rm -rf apps/api'"), ""],
+  ["guard-bash", bash("ls | xargs rm -rf"), "재리뷰1"],
+  ["guard-bash", bash("find docs -exec rm -rf {} \\;"), "재리뷰1"],
+  ["guard-bash", bash("sudo --user root rm -rf docs/tasks"), "재리뷰2"],
+  ["guard-bash", bash("xargs -n 1 rm -rf < dirs.txt"), "재리뷰2"],
+  ["guard-bash", bash("git -C apps clean -fdx"), "재리뷰2"],
+  // .env 읽기·쓰기
+  ["protect-files", file("Write", "/work/shop/.env"), ""],
+  ["protect-files", file("Edit", ".env.local"), ""],
+  ["protect-files", file("Edit", "/work/shop/apps/api/.env"), ""],
+  ["protect-files", file("Write", "apps\\api\\.env"), ""],
+  ["protect-files", file("Read", "/work/shop/apps/api/.env.development"), ""],
+  ["protect-files", bash("echo API_PORT=1 >> .env"), ""],
+  ["protect-files", bash("echo x > .env"), "리뷰1"],
+  ["protect-files", bash("cat .env"), "리뷰1"],
+  ["protect-files", bash("cat .e'nv'"), ""],
+  ["protect-files", bash("grep KEY apps/api/.env.local"), ""],
+  ["protect-files", bash("cat apps/api/.env.development"), "재리뷰1"],
+  ["protect-files", bash("node -e \"require('fs').writeFileSync('.env', 'x')\""), "리뷰1"],
+  ["protect-files", bash("python3 -c \"open('.env', 'w').write('x')\""), ""],
+  ["protect-files", bash("bash -c 'echo x > .env'"), ""],
+  ["protect-files", bash("node <<'EOF'\nrequire('fs').writeFileSync('.env','x')\nEOF"), "재리뷰1"],
+  ["protect-files", bash("node <<'EOF'\nrequire('fs').appendFileSync('apps/api/.env', 'x')\nEOF"), ""],
+  // 이미 커밋된 마이그레이션 수정·삭제·이동
+  ["protect-files", file("Write", "/work/shop/packages/db/migrations/0001_init.sql"), ""],
+  ["protect-files", file("Edit", "packages/db/migrations/0001_init.sql"), ""],
+  ["protect-files", file("Edit", "packages\\db\\migrations\\0001_init.sql"), ""],
+  ["protect-files", bash("sed -i s/a/b/ packages/db/migrations/0001_init.sql"), "리뷰1"],
+  ["protect-files", bash("sed -i '' s/a/b/ packages/db/migrations/0001_init.sql"), ""],
+  ["protect-files", bash("cd packages/db/migrations && sed -i s/a/b/ 0001_init.sql"), "리뷰1"],
+  ["protect-files", bash("cd packages/db && echo x >> migrations/0001_init.sql"), ""],
+  ["protect-files", bash("cd /work/shop/packages/db/migrations; rm 0001_init.sql"), ""],
+  ["protect-files", bash("cd packages/db/migrations\ncat > 0001_init.sql <<'EOF'\nselect 1;\nEOF"), ""],
+  ["protect-files", bash("echo x >> packages\\db\\migrations\\0001_init.sql"), "리뷰1"],
+  ["protect-files", bash("cp new.sql packages\\db\\migrations\\0001_init.sql"), ""],
+  ["protect-files", bash("node -e \"require('fs').writeFileSync('packages/db/migrations/0001_init.sql', 'x')\""), "재리뷰1"],
+  ["protect-files", bash('bash -c "cd packages/db/migrations && sed -i s/a/b/ 0001_init.sql"'), "재리뷰1"],
+  ["protect-files", bash("tee packages/db/migrations/0001_init.sql < new.sql"), ""],
+  ["protect-files", bash("env FOO=1 sed -i s/a/b/ packages/db/migrations/0001_init.sql"), ""],
+  ["protect-files", bash("sed -i s/a/b/ packages/db/migrations/*.sql"), "재리뷰1"],
+  ["protect-files", bash("mv packages/db/migrations /tmp/old"), ""],
+  ["protect-files", bash("cd $SOMEWHERE && echo x >> 0001_init.sql"), ""],
+  // 작업 폴더를 바꾸는 옵션·eval 뒤의 상대 경로(재리뷰2 F3)
+  ["protect-files", bash("eval 'cd packages/db/migrations'; sed -i '' s/a/b/ 0001_init.sql"), "재리뷰2"],
+  ["protect-files", bash('eval "cd packages/db/migrations" && echo x >> 0001_init.sql'), "재리뷰2"],
+  ["protect-files", bash("{ cd packages/db/migrations; sed -i s/a/b/ 0001_init.sql; }"), "재리뷰2"],
+  ["protect-files", bash("env --chdir packages/db/migrations sed -i s/a/b/ 0001_init.sql"), "재리뷰2"],
+  ["protect-files", bash("env -C packages/db/migrations sed -i s/a/b/ 0001_init.sql"), "재리뷰2"],
+  // 파일을 쓰는 git 옵션(재리뷰2 F2)
+  ["protect-files", bash("git diff --output=packages/db/migrations/0001_init.sql"), "재리뷰2"],
+  ["protect-files", bash("git diff --output packages/db/migrations/0001_init.sql HEAD~1"), "재리뷰2"],
+  ["protect-files", bash("git log -p --output=packages/db/migrations/0001_init.sql"), "재리뷰2"],
+  ["protect-files", bash("git -C packages/db/migrations diff --output=0001_init.sql"), "재리뷰2"],
+  ["protect-files", bash("git --no-pager show HEAD --output=packages\\db\\migrations\\0001_init.sql"), "재리뷰2"],
+  // find로 폴더 아래 파일을 한꺼번에 고치기
+  ["protect-files", bash("find packages/db/migrations -name '*.sql' -exec sed -i '' s/a/b/ {} +"), "재리뷰2"],
+  ["protect-files", bash("find . -name '*.sql' -exec sed -i s/a/b/ {} \\;"), "재리뷰2"],
+  ["protect-files", bash("cd packages/db && find migrations -delete"), "재리뷰2"],
+  // 폴더째 지우기·옮기기, 이름이 같은 파일 덮어쓰기
+  ["protect-files", bash("rm -r packages/db"), "재리뷰2"],
+  ["protect-files", bash("git rm -r packages/db/migrations"), "재리뷰2"],
+  ["protect-files", bash("mv packages/db /tmp/db-old"), "재리뷰2"],
+  ["protect-files", bash("cp /tmp/0001_init.sql packages/db/migrations/"), "재리뷰2"],
+  ["protect-files", bash("cd packages/db && cp ~/0001_init.sql migrations"), "재리뷰2"],
+];
+
+// 두 PreToolUse Hook을 모두 통과해야 하는 정상 입력. 수업에서 흔히 쓰는 명령.
+const ALLOWED = [
+  // 검증·실행
+  bash("npm ci"),
+  bash("npm run verify"),
+  bash("npm test"),
+  bash("npm test -- packages/db"),
+  bash("npm run dev"),
+  bash("npm run lint"),
+  bash("npm run typecheck"),
+  bash("npm run build"),
+  bash("npm run grade"),
+  bash("npm run db:reset"),
+  bash("env CI=1 npm test"),
+  bash("env FOO=1 npm run verify"),
+  bash('bash -c "npm run verify"'),
+  bash("node scripts/verify.mjs"),
+  bash("node scripts/start.mjs --check"),
+  bash('node -e "console.log(process.version)"'),
+  bash("npx vitest run"),
+  bash("npx vitest run packages/db"),
+  bash("npx vitest run apps/api/src/orders"),
+  bash("npx tsc --noEmit"),
+  bash("npx eslint apps/api/src/app.ts"),
+  // git 일상 작업
+  bash("git status"),
+  bash("git status --short"),
+  bash("git diff"),
+  bash("git diff --stat day2-a day2-b"),
+  bash("git diff -- packages/db/migrations/0001_init.sql"),
+  bash("git diff > /tmp/changes.patch"),
+  bash("git diff --output=/tmp/changes.patch"),
+  bash("git log --oneline -5"),
+  bash("git --no-pager log -3"),
+  bash("git -c core.pager=cat log -1"),
+  bash("git -C ../other status"),
+  bash("git show HEAD:packages/db/migrations/0001_init.sql"),
+  bash("git add apps/api/src/app.ts"),
+  bash("git add -A"),
+  bash("git add packages/db/migrations/0002_low_stock.sql"),
+  bash('git commit -m "상품 조회 조건 수정"'),
+  bash('git commit -m "force push 금지 문서 추가"'),
+  bash("git commit -m \"git push -f 설명\""),
+  bash('git commit -m "env git push -f 막기"'),
+  bash('git commit -m "Keep .env out of commits"'),
+  bash('git add -A && git commit -m "안전재고 알림 추가"'),
+  bash("git push"),
+  bash("git push origin day2-a"),
+  bash("git push origin feature"),
+  bash("git push -u origin feature"),
+  bash("sudo -u deploy git push origin main"),
+  bash("git switch -c low-stock"),
+  bash("git merge main"),
+  bash("git fetch origin"),
+  bash("git restore apps/api/src/app.ts"),
+  // 파일 만들기·읽기
+  bash("mkdir -p apps/api/src/alerts"),
+  bash("touch apps/api/src/alerts/low-stock.ts"),
+  bash("cat README.md"),
+  bash("cat .env.example"),
+  bash("head -20 packages/db/migrations/0001_init.sql"),
+  bash('rg -n "Money" packages'),
+  bash("ls packages/db/migrations"),
+  bash("cat packages/db/migrations/0001_init.sql"),
+  bash("cd packages/db/migrations && cat 0001_init.sql"),
+  bash("cd packages/db/migrations && sed -n 1p 0001_init.sql"),
+  bash("sed -n '1,20p' packages/db/migrations/0001_init.sql"),
+  bash("cp packages/db/migrations/0001_init.sql /tmp/backup.sql"),
+  bash("echo hi > notes.txt"),
+  bash('echo "rm -rf apps"'),
+  bash('echo "git push -f"'),
+  bash("cd docs && echo x > 0001_init.sql"),
+  // 소스 고치기
+  bash("sed -i '' 's/old/new/' apps/api/src/app.ts"),
+  bash("sed -i 's/a/b/' apps/web/src/App.tsx"),
+  file("Edit", "apps/api/src/config.ts"),
+  file("Write", "/work/shop/.env.example"),
+  file("Read", "packages/db/migrations/0001_init.sql"),
+  // 새 마이그레이션 만들고 고치기(재리뷰2 F4)
+  bash("mkdir -p packages/db/migrations"),
+  bash("mkdir packages/db/migrations"),
+  bash("mkdir -p packages/db/migrations && cat > packages/db/migrations/9999_review_fixture.sql <<'EOF'\n-- new migration\nEOF"),
+  bash("node -e \"require('fs').mkdirSync('packages/db/migrations', {recursive: true})\""),
+  bash("touch packages/db/migrations/0002_low_stock.sql"),
+  bash("cat > packages/db/migrations/0002_low_stock.sql <<'EOF'\nalter table products add column safety_stock integer;\nEOF"),
+  bash("echo x > packages/db/migrations/0002_add_memo.sql"),
+  bash("echo '-- memo' >> packages/db/migrations/0002_low_stock.sql"),
+  bash("cp /tmp/0002_low_stock.sql packages/db/migrations/"),
+  bash("cp /tmp/draft.sql packages/db/migrations/0002_low_stock.sql"),
+  bash("cd packages/db/migrations && sed -i '' s/a/b/ 0002_low_stock.sql"),
+  file("Write", "packages/db/migrations/0002_add_memo.sql"),
+  file("Edit", "packages/db/migrations/0002_low_stock.sql"),
+  // 빌드 산출물·파일 하나 지우기
+  bash("rm -rf node_modules"),
+  bash("rm -rf dist node_modules"),
+  bash("rm -rf apps/web/dist"),
+  bash("rm dist/old.js"),
+  bash("rm apps/api/src/old.ts"),
+  bash("rm -f notes.txt"),
+  bash("rm packages/db/migrations/0002_low_stock.sql"),
+  bash("rm /tmp/scratch.txt"),
+  bash("find apps/api -name '*.ts' -exec sed -i '' s/a/b/ {} +"),
+  bash("find . -name '*.ts' -exec sed -i s/a/b/ {} \\;"),
+  bash("find packages/db/migrations -name '*.sql' -exec cat {} +"),
+  bash("find . -name '*.sql' -print"),
+  bash("mv /tmp/0002_low_stock.sql packages/db/migrations/"),
+  bash("git mv apps/api/src/a.ts apps/api/src/b.ts"),
+  bash("git rm apps/api/src/old.ts"),
+];
+
+describe("막는다", () => {
+  it.each(BLOCKED.map(([hook, payload, source]) => [hook, source || "기본", payload.tool_input.command ?? `${payload.tool_name} ${payload.tool_input.file_path}`, payload]))(
+    "%s [%s] %s",
+    (hook, _source, _label, payload) => {
+      expect(denied(HOOKS[hook](payload))).toBe(true);
+    },
+  );
+});
+
+describe("통과한다(오탐 없음)", () => {
+  it.each(ALLOWED.map((payload) => [payload.tool_input.command ?? `${payload.tool_name} ${payload.tool_input.file_path}`, payload]))("%s", (_label, payload) => {
+    expect(HOOKS["guard-bash"](payload)).toBeNull();
+    expect(HOOKS["protect-files"](payload)).toBeNull();
   });
 });
 
 describe("protect-files", () => {
-  const cwd = "/work/shop";
-  const COMMITTED = ["packages/db/migrations/0001_init.sql"];
-  const committed = (relative) => COMMITTED.some((file) => file === relative || file.startsWith(`${relative}/`));
-  const file = (tool_name, file_path) => ({ tool_name, tool_input: { file_path } });
-
-  it.each([
-    [file("Write", "/work/shop/.env")],
-    [file("Edit", ".env.local")],
-    [file("Edit", "/work/shop/apps/api/.env")],
-    [file("Write", "/work/shop/packages/db/migrations/0001_init.sql")],
-    [file("Edit", "packages/db/migrations/0001_init.sql")],
-    [bash("echo API_PORT=1 >> .env")],
-    [bash("sed -i '' s/a/b/ packages/db/migrations/0001_init.sql")],
-    // R2: 작업 폴더를 옮긴 뒤의 상대 경로
-    [bash("cd packages/db/migrations && sed -i s/a/b/ 0001_init.sql")],
-    [bash("cd packages/db && echo x >> migrations/0001_init.sql")],
-    [bash("cd /work/shop/packages/db/migrations; rm 0001_init.sql")],
-    [bash("cd packages/db/migrations\ncat > 0001_init.sql <<'EOF'\nselect 1;\nEOF")],
-    // R2: Windows 경로 구분자
-    [bash("echo x >> packages\\db\\migrations\\0001_init.sql")],
-    [bash("cp new.sql packages\\db\\migrations\\0001_init.sql")],
-    [file("Edit", "packages\\db\\migrations\\0001_init.sql")],
-    [file("Write", "apps\\api\\.env")],
-    // R2: 인라인 스크립트·셸 안의 쓰기
-    [bash("node -e \"require('fs').writeFileSync('.env', 'x')\"")],
-    [bash("python3 -c \"open('.env', 'w').write('x')\"")],
-    [bash("bash -c 'echo x > .env'")],
-    [bash("node <<'EOF'\nrequire('fs').appendFileSync('apps/api/.env', 'x')\nEOF")],
-    [bash("tee packages/db/migrations/0001_init.sql < new.sql")],
-    [bash("env FOO=1 sed -i s/a/b/ packages/db/migrations/0001_init.sql")],
-    [bash("sed -i s/a/b/ packages/db/migrations/*.sql")],
-    [bash("mv packages/db/migrations /tmp/old")],
-    [bash("cd $SOMEWHERE && echo x >> 0001_init.sql")],
-    [file("Read", "/work/shop/apps/api/.env.development")],
-    // .env 읽기: permissions의 Read deny는 Bash를 덮지 않으므로 Hook이 막는다.
-    [bash("cat .env")],
-    [bash("grep KEY apps/api/.env.local")],
-  ])("막는다: %j", (payload) => {
-    expect(denied(protectFiles(payload, cwd, committed))).toBe(true);
-  });
-
-  it.each([
-    [file("Write", "/work/shop/.env.example")],
-    [file("Write", "packages/db/migrations/0002_add_memo.sql")],
-    [file("Edit", "apps/api/src/config.ts")],
-    [bash("cat .env.example")],
-    [bash("echo hi > notes.txt")],
-    [bash("cat packages/db/migrations/0001_init.sql")],
-    [bash("cd packages/db/migrations && cat 0001_init.sql")],
-    [bash("cd packages/db/migrations && sed -n 1p 0001_init.sql")],
-    [bash("cp packages/db/migrations/0001_init.sql /tmp/backup.sql")],
-    [bash("echo x > packages/db/migrations/0002_add_memo.sql")],
-    [bash("cd docs && echo x > 0001_init.sql")],
-    [bash('git commit -m "Keep .env out of commits"')],
-  ])("통과시킨다: %j", (payload) => {
-    expect(protectFiles(payload, cwd, committed)).toBeNull();
-  });
-
   describe("새 마이그레이션은 HEAD 기준으로 판단한다(R4)", () => {
     let repo;
     beforeAll(() => {
@@ -255,6 +394,11 @@ describe("stop-verify", () => {
   it("R1: 전체 verify 뒤 Bash로 코드를 고쳤으면 다시 막는다", () => {
     const text = lines(use("a", "Edit", { file_path: "a.ts" }), ...verifyRun("b", T1), use("c", "Bash", { command: "sed -i '' s/a/b/ apps/api/src/app.ts" }));
     expect(stop(text, T2)).toMatchObject({ decision: "block" });
+  });
+
+  it("재리뷰2: git diff --output으로 소스를 덮어쓴 것도 코드 변경으로 본다", () => {
+    expect(stop(lines(use("a", "Bash", { command: "git diff --output=apps/api/src/app.ts" })), T2)).toMatchObject({ decision: "block" });
+    expect(stop(lines(use("a", "Bash", { command: "git diff --stat" })), T2)).toBeNull();
   });
 
   it("문서(.md)만 고쳤으면 verify를 요구하지 않는다", () => {

@@ -3,12 +3,15 @@
 // 판정 기준(예측할 수 있게 단순하게):
 //   - .env(.env.local 등, .env.example·.env.sample 제외): 파일 도구가 그 경로를 다루거나, Bash 명령에 그 경로가 나타나면 막는다.
 //   - 마이그레이션: packages/db/migrations/<번호>_<이름>.sql 중 HEAD에 있는 파일이 쓰기 대상으로 나타나면 막는다.
-//     쓰기 대상 = 출력 리다이렉션, 읽기 전용이 아닌 명령의 인자(cp·ln은 마지막 인자), node -e·python -c·heredoc 스크립트 안의 경로.
-//     상대 경로는 `cd`를 따라간 작업 폴더 기준이고, 역슬래시(Windows) 경로도 같게 본다.
-//   - HEAD에 없는 번호 파일은 새 파일이므로 커밋 전까지 고칠 수 있다.
+//     쓰기 대상 = 출력 리다이렉션·출력 옵션(`git diff --output=`), 읽기 전용이 아닌 명령의 인자(cp는 목적지, mkdir·touch는 제외),
+//     node -e·python -c·heredoc 스크립트 안의 파일 경로.
+//     폴더째 지우거나 옮기는 명령(rm -r, mv, git rm -r)은 그 폴더 안에 HEAD의 마이그레이션이 있으면 막는다.
+//     상대 경로는 `cd`·`eval "cd ..."`·`git -C`를 따라간 작업 폴더 기준이고, 역슬래시(Windows) 경로도 같게 본다.
+//   - HEAD에 없는 번호 파일은 새 파일이므로 커밋 전까지 고칠 수 있다. 마이그레이션 폴더를 만드는 것도 괜찮다.
+// 판정 범위와 알려진 한계는 README.md에 있다.
 import { spawnSync } from "node:child_process";
 import path from "node:path";
-import { mentionedPaths, simpleCommands, toSlash, writeTargets } from "./bash-command.mjs";
+import { bulkScopes, mentionedPaths, removedPaths, simpleCommands, toSlash, writeTargets } from "./bash-command.mjs";
 import { denyTool, emit, isMain, readPayload } from "./hook-io.mjs";
 
 const root = path.resolve(import.meta.dirname, "..", "..");
@@ -30,19 +33,39 @@ function isCommitted(relative, cwd) {
 }
 
 /**
- * 쓰기 대상 하나가 가리키는 마이그레이션 경로(프로젝트 기준). 아니면 null.
- * 작업 폴더를 모르면(cd $X 뒤) 파일 이름만으로 마이그레이션 폴더의 파일로 본다.
+ * 쓰기 대상 파일 하나가 가리키는 마이그레이션 파일(프로젝트 기준). 아니면 null.
+ * 마이그레이션 폴더 안의 glob(`*.sql`)은 폴더의 기존 파일 전부로 보고 MIGRATIONS_DIR를 돌려준다.
+ * 폴더 자체는 쓰기 대상이 아니다(mkdir 등). 작업 폴더를 모르면(cd $X 뒤) 파일 이름만으로 본다.
  */
-function migrationPath(target, cwd, projectRoot) {
+function migrationFile(target, cwd, projectRoot) {
   const slashed = toSlash(target);
   if (slashed === "") return null;
   const name = slashed.split("/").pop();
   if (cwd === null && !path.isAbsolute(slashed)) return MIGRATION_NAME.test(name) ? `${MIGRATIONS_DIR}/${name}` : null;
   const relative = toSlash(path.relative(projectRoot, path.resolve(cwd, slashed)));
-  if (relative === MIGRATIONS_DIR) return MIGRATIONS_DIR;
   if (path.posix.dirname(relative) !== MIGRATIONS_DIR) return null;
   if (/[*?[]/.test(name)) return MIGRATIONS_DIR;
   return MIGRATION_NAME.test(name) ? relative : null;
+}
+
+/** 통째로 지우거나 옮기는 경로가 마이그레이션 폴더이거나 그 위 폴더면 MIGRATIONS_DIR, 아니면 null. */
+function removedMigrations(target, cwd, projectRoot) {
+  const slashed = toSlash(target).replace(/\/+$/, "");
+  if (slashed === "") return null;
+  if (cwd === null && !path.isAbsolute(slashed)) return slashed.split("/").pop() === "migrations" ? MIGRATIONS_DIR : null;
+  const removed = path.resolve(cwd, slashed);
+  const migrations = path.resolve(projectRoot, MIGRATIONS_DIR);
+  return migrations === removed || migrations.startsWith(`${removed}${path.sep}`) ? MIGRATIONS_DIR : null;
+}
+
+/** find의 -name 조건이 마이그레이션 파일(`0001_init.sql`처럼 번호로 시작하는 .sql)을 고를 수 있으면 true. 조건이 없으면 true. */
+function namesCanMatchMigration(names) {
+  if (names.length === 0) return true;
+  return names.some((pattern) => {
+    if (/\.sql$/i.test(pattern)) return true;
+    const regex = new RegExp(`^${pattern.replace(/[.+^${}()|\\]/g, "\\$&").replaceAll("*", ".*").replaceAll("?", ".")}$`, "i");
+    return regex.test("0001_init.sql");
+  });
 }
 
 const ENV_REASON =
@@ -71,12 +94,18 @@ export function decide(payload, projectRoot = root, committed = isCommitted) {
     if (target === "") return null;
     if (isEnvFile(target)) return denyTool(ENV_REASON);
     if (payload.tool_name === "Read") return null;
-    return checkMigrations([migrationPath(target, cwd, projectRoot)], projectRoot, committed);
+    return checkMigrations([migrationFile(target, cwd, projectRoot)], projectRoot, committed);
   }
   if (payload.tool_name !== "Bash") return null;
   const commands = simpleCommands(String(input.command ?? ""), cwd);
   if (commands.some((simple) => mentionedPaths(simple).some(isEnvFile))) return denyTool(ENV_REASON);
-  const candidates = commands.flatMap((simple) => writeTargets(simple).map((target) => migrationPath(target, simple.cwd, projectRoot)));
+  const candidates = commands.flatMap((simple) => [
+    ...writeTargets(simple).map((target) => migrationFile(target, simple.cwd, projectRoot)),
+    ...removedPaths(simple).map((target) => removedMigrations(target, simple.cwd, projectRoot)),
+    ...bulkScopes(simple)
+      .filter(({ names }) => namesCanMatchMigration(names))
+      .flatMap(({ roots }) => roots.map((target) => removedMigrations(target, simple.cwd, projectRoot))),
+  ]);
   return checkMigrations(candidates, projectRoot, committed);
 }
 

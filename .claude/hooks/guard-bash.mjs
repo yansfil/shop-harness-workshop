@@ -1,5 +1,6 @@
 // PreToolUse Hook(Bash): force push와 대량 삭제를 실행 전에 막는다.
-// 명령은 bash-command.mjs가 펼친다: `env`·`sudo`·`VAR=값` 접두어, `;`·`&&`·`|`로 이은 명령, 서브셸, `bash -c` 안까지 본다.
+// 명령은 bash-command.mjs가 펼친다: `env`·`sudo --user x`·`VAR=값` 접두어, `git -C dir`·`git --work-tree x` 같은 전역 옵션,
+// `;`·`&&`·`|`로 이은 명령, 서브셸, `bash -c`·`eval` 안까지 본다. 판정 범위와 알려진 한계는 README.md에 있다.
 import path from "node:path";
 import { commandName, gitSubcommand, simpleCommands, toSlash } from "./bash-command.mjs";
 import { denyTool, emit, isMain, readPayload } from "./hook-io.mjs";
