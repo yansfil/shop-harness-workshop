@@ -32,7 +32,7 @@
 
 | ID | 상황·입력 → 행동 → 관찰할 결과 | 확인 방법 |
 | --- | --- | --- |
-| AC-1 | 상품 합계 48,700원 장바구니를 견적하면 `shippingFee: 3000`, `total: 51700`, `freeShippingRemaining: 1300`이다 | API 통합 테스트 `tests/orders.test.ts` |
+| AC-1 | 상품 합계 47,800원(17,900 + 14,900 + 5,000 × 3) 장바구니를 견적하면 `shippingFee: 3000`, `total: 50800`, `freeShippingRemaining: 2200`이다 | API 통합 테스트 `tests/orders.test.ts` |
 | AC-2 | 상품 합계가 정확히 50,000원이면 `shippingFee: 0`, `freeShippingRemaining: 0`이다 | API 테스트(5,000원 상품 10개) |
 | AC-3 | 상품 합계 30,000원 이상 50,000원 미만(예전에는 무료였던 구간)은 배송비 3,000원이다 | API 테스트 |
 | AC-4 | 주문을 만들면 견적과 같은 배송비가 주문에 저장되고, 이후 주문 조회는 저장된 값을 그대로 돌려준다 | API 테스트 |
