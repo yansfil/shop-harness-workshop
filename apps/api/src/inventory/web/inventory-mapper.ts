@@ -1,6 +1,6 @@
 import type { InboundResponse, InventoryItem as InventoryItemDto, InventoryListResponse, InventoryMovement as MovementDto, InventoryMovementsResponse } from "@grabmarket/contracts";
 import type { InboundResult, MovementHistory } from "../application/inventory-service.ts";
-import type { InventoryItem, StockMovement } from "../domain/stock.ts";
+import { type InventoryItem, isLowStock, type StockMovement } from "../domain/stock.ts";
 
 export function toInventoryItemDto(item: InventoryItem): InventoryItemDto {
   return {
@@ -8,6 +8,8 @@ export function toInventoryItemDto(item: InventoryItem): InventoryItemDto {
     productName: item.productName,
     categoryName: item.categoryName,
     quantity: item.quantity,
+    safetyStock: item.safetyStock,
+    lowStock: isLowStock(item),
     updatedAt: item.updatedAt.toISOString(),
   };
 }

@@ -6,11 +6,15 @@ export const InventoryItemSchema = z.object({
   productName: z.string(),
   categoryName: z.string(),
   quantity: z.number().int().nonnegative(),
+  /** 이 수량보다 적으면 부족하다고 보는 기준. 값은 시드가 정한다. */
+  safetyStock: z.number().int().nonnegative(),
+  /** 수량이 안전재고보다 적으면 true(품절 포함, 같으면 false). 서버가 계산하고 화면은 그대로 보인다. */
+  lowStock: z.boolean(),
   updatedAt: DateTimeSchema,
 });
 export type InventoryItem = z.infer<typeof InventoryItemSchema>;
 
-/** GET /api/admin/inventory (관리자). 상품 전부, 상품 id 순. 안전재고 미만 표시는 없다(과제). */
+/** GET /api/admin/inventory (관리자). 상품 전부, 상품 id 순. 상품마다 안전재고(safetyStock)와 안전재고 미만 여부(lowStock)를 준다. */
 export const InventoryListResponseSchema = z.object({ items: z.array(InventoryItemSchema) });
 export type InventoryListResponse = z.infer<typeof InventoryListResponseSchema>;
 

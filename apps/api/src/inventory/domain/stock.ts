@@ -13,7 +13,13 @@ export interface InventoryItem {
   productName: string;
   categoryName: string;
   quantity: number;
+  safetyStock: number;
   updatedAt: Date;
+}
+
+/** 안전재고 미만인지. 품절(0)도 미만이고, 안전재고와 같으면 미만이 아니다. */
+export function isLowStock(item: Pick<InventoryItem, "quantity" | "safetyStock">): boolean {
+  return item.quantity < item.safetyStock;
 }
 
 export type MovementKind = "inbound" | "outbound";

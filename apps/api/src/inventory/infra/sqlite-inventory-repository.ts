@@ -7,6 +7,7 @@ interface ItemRow {
   product_name: string;
   category_name: string;
   quantity: number;
+  safety_stock: number;
   updated_at: string;
 }
 
@@ -23,7 +24,7 @@ interface MovementRow {
 }
 
 const ITEM_SELECT = `
-  SELECT i.product_id, p.name AS product_name, c.name AS category_name, i.quantity, i.updated_at
+  SELECT i.product_id, p.name AS product_name, c.name AS category_name, i.quantity, i.safety_stock, i.updated_at
     FROM inventory i
     JOIN products p ON p.id = i.product_id
     JOIN categories c ON c.id = p.category_id`;
@@ -41,6 +42,7 @@ function toItem(row: ItemRow): InventoryItem {
     productName: row.product_name,
     categoryName: row.category_name,
     quantity: row.quantity,
+    safetyStock: row.safety_stock,
     updatedAt: new Date(row.updated_at),
   };
 }
