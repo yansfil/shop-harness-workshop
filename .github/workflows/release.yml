@@ -1,0 +1,65 @@
+name: release
+
+# Release를 발행하면(또는 태그를 지정해 직접 돌리면) 사내망에서 clone·npm이 막힌 수강생용 압축 파일을 만들어 올린다.
+# 압축 파일 = git 기록 전체(모든 브랜치·태그) + 그 OS용 node_modules. 모든 브랜치가 같은 package-lock이라 브랜치를 바꿔도 다시 설치하지 않는다.
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 압축 파일을 올릴 Release 태그
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  bundle:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            target: windows-x64
+            expect: win32-x64
+          - os: macos-latest
+            target: mac-arm64
+            expect: darwin-arm64
+    runs-on: ${{ matrix.os }}
+    env:
+      TAG: ${{ github.event.release.tag_name || inputs.tag }}
+      GH_TOKEN: ${{ github.token }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name || inputs.tag }}
+          path: shop-harness-workshop
+          # 모든 브랜치·태그를 받는다(origin/* 원격 브랜치로 남아 git switch로 바로 바꿀 수 있다).
+          fetch-depth: 0
+          # 압축 파일의 .git/config에 토큰이 남지 않게 한다.
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: runner OS·CPU 확인
+        run: |
+          actual=$(node -p "process.platform + '-' + process.arch")
+          if [ "$actual" != "${{ matrix.expect }}" ]; then echo "runner가 $actual 입니다. ${{ matrix.expect }}가 필요합니다."; exit 1; fi
+      - name: 의존성 설치
+        working-directory: shop-harness-workshop
+        run: npm ci
+      - name: 압축
+        run: |
+          name="shop-harness-workshop-${TAG//\//-}-${{ matrix.target }}.zip"
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            7z a -tzip -mx=5 "$name" shop-harness-workshop > /dev/null
+          else
+            ditto -c -k --keepParent shop-harness-workshop "$name"
+          fi
+          echo "ARCHIVE=$name" >> "$GITHUB_ENV"
+      - name: Release에 올리기
+        run: gh release upload "$TAG" "$ARCHIVE" --clobber --repo "${{ github.repository }}"
