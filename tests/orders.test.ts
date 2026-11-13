@@ -1,4 +1,4 @@
-import { AdminOrderResponseSchema, ApiErrorResponseSchema, MyOrderListResponseSchema, OrderQuoteResponseSchema, OrderResponseSchema, ROUTES, buildPath } from "@grabmarket/contracts";
+import { AdminOrderListResponseSchema, AdminOrderResponseSchema, ApiErrorResponseSchema, MyOrderListResponseSchema, OrderQuoteResponseSchema, OrderResponseSchema, ROUTES, buildPath } from "@grabmarket/contracts";
 import request from "supertest";
 import { describe, expect, it } from "vitest";
 import { ACCOUNT, createTestApp, loginAs, orderBody, PRODUCT } from "./support/test-app.ts";
@@ -137,6 +137,17 @@ describe("관리자 주문", () => {
 
     const list = await admin.get(ROUTES.adminOrders).expect(200);
     expect((list.body as { orders: { customerName: string }[] }).orders.map((row) => row.customerName).sort()).toEqual(["김하늘", "이도윤"]);
+  });
+
+  it("관리자 주문 목록 줄에는 첫 상품 이름과 상품 수가 함께 온다", async () => {
+    const { app } = createTestApp();
+    const admin = await loginAs(app, ACCOUNT.admin);
+    const customer = await loginAs(app, ACCOUNT.customerA);
+    await customer.post(ROUTES.orders).send(orderBody([{ productId: PRODUCT.tangerine, quantity: 1 }, { productId: PRODUCT.socks, quantity: 2 }])).expect(201);
+
+    const { orders } = AdminOrderListResponseSchema.parse((await admin.get(ROUTES.adminOrders).expect(200)).body);
+    expect(orders).toHaveLength(1);
+    expect(orders[0]).toMatchObject({ itemCount: 2, firstItemName: "제주 감귤 3kg" });
   });
 
   it("주문 상태는 바로 다음 단계로만 넘어가고 이미 그 상태면 그대로 둔다", async () => {
