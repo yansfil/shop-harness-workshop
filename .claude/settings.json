@@ -23,11 +23,7 @@
       "Edit(./.env)",
       "Edit(./.env.local)",
       "Edit(./.env.production)",
-      "Edit(./**/.env)",
-      "Write(./.env)",
-      "Write(./.env.local)",
-      "Write(./.env.production)",
-      "Write(./**/.env)"
+      "Edit(./**/.env)"
     ]
   },
   "hooks": {
