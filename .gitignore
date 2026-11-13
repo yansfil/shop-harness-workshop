@@ -6,3 +6,4 @@ data/*.sqlite*
 coverage/
 *.tsbuildinfo
 exports/
+reports/

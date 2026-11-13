@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "grabmarket-db": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["tools/mcp-db/src/server.ts"]
+    }
+  }
+}
