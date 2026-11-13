@@ -110,6 +110,12 @@ export type OrderDetail = z.infer<typeof OrderDetailSchema>;
 export const OrderResponseSchema = z.object({ order: OrderDetailSchema });
 export type OrderResponse = z.infer<typeof OrderResponseSchema>;
 
+/** 내 주문 상세. 주문한 지 며칠 지났는지(오늘이면 0)를 더한다 */
+export const MyOrderDetailSchema = OrderDetailSchema.extend({ elapsedDays: z.number().int().nonnegative() });
+export type MyOrderDetail = z.infer<typeof MyOrderDetailSchema>;
+export const MyOrderResponseSchema = z.object({ order: MyOrderDetailSchema });
+export type MyOrderResponse = z.infer<typeof MyOrderResponseSchema>;
+
 export const OrderSummarySchema = z.object({
   id: IdSchema,
   orderNumber: z.string(),
@@ -129,7 +135,7 @@ export type MyOrderListResponse = z.infer<typeof MyOrderListResponseSchema>;
 
 export const OrderParamsSchema = z.object({ orderId: z.coerce.number().int().positive() });
 
-// GET /api/orders/:orderId (고객 로그인 필요) → OrderResponseSchema. 남의 주문이면 404 NOT_FOUND.
+// GET /api/orders/:orderId (고객 로그인 필요) → MyOrderResponseSchema. 남의 주문이면 404 NOT_FOUND.
 
 // ---- 관리자 ----
 
@@ -148,7 +154,7 @@ export type AdminOrderRow = z.infer<typeof AdminOrderRowSchema>;
 
 /**
  * GET /api/admin/orders (관리자). 전체 주문을 한 번에, 최신순.
- * 필터·검색·페이지 나누기는 일부러 없다(D1-A 과제). 고객이면 403 FORBIDDEN.
+ * 필터·검색·페이지 나누기는 아직 없다(실습 과제). 고객이면 403 FORBIDDEN.
  */
 export const AdminOrderListResponseSchema = z.object({ orders: z.array(AdminOrderRowSchema) });
 export type AdminOrderListResponse = z.infer<typeof AdminOrderListResponseSchema>;

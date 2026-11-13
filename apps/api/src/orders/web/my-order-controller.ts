@@ -1,7 +1,7 @@
 import {
   type MyOrderListResponse,
+  type MyOrderResponse,
   OrderParamsSchema,
-  type OrderResponse,
   ROUTES,
 } from "@grabmarket/contracts";
 import type { Router } from "express";
@@ -45,7 +45,8 @@ export class MyOrderController implements Controller {
       const { orderId } = OrderParamsSchema.parse(req.params);
       const order = this.#orders.findForCustomer(user.id, orderId);
       if (order === undefined) throw notFound("주문");
-      const body: OrderResponse = {
+      const elapsedDays = Math.max(0, Math.floor((new Date().getTime() - order.createdAt.getTime()) / 86_400_000));
+      const body: MyOrderResponse = {
         order: {
           id: order.id,
           orderNumber: order.number,
@@ -65,6 +66,7 @@ export class MyOrderController implements Controller {
           shipping: order.shipping,
           createdAt: order.createdAt.toISOString(),
           updatedAt: order.updatedAt.toISOString(),
+          elapsedDays,
         },
       };
       res.json(body);
