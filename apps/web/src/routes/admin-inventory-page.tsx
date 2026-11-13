@@ -39,6 +39,11 @@ function InventoryView({ initial }: { initial: InventoryItem[] }) {
   const [historyVersion, setHistoryVersion] = useState(0);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [lowOnly, setLowOnly] = useState(false);
+  const lowCount = items.filter((item) => item.lowStock).length;
+  // 입고로 부족한 상품이 모두 사라지면 필터도 저절로 풀려서 빈 목록이 남지 않는다.
+  const filtering = lowOnly && lowCount > 0;
+  const visibleItems = filtering ? items.filter((item) => item.lowStock) : items;
 
   if (items.length === 0) {
     return (
@@ -70,6 +75,21 @@ function InventoryView({ initial }: { initial: InventoryItem[] }) {
           입고 등록
         </Button>
       </div>
+      {lowCount > 0 && (
+        <button
+          type="button"
+          aria-pressed={filtering}
+          onClick={() => {
+            setLowOnly(!filtering);
+          }}
+          className="mb-3 flex h-12 w-full items-center justify-between rounded-md bg-danger-soft px-4 text-sm font-extrabold text-danger"
+        >
+          안전재고 미만 {lowCount}개
+          <span aria-hidden="true" className="text-xs-plus font-semibold">
+            {filtering ? "전체 보기" : "부족한 상품만 보기"}
+          </span>
+        </button>
+      )}
       <div className="flex flex-col gap-3 lg:grid lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start">
         <div className="overflow-hidden rounded-md border border-line bg-ground">
           <table className="w-full border-collapse text-left text-sm">
@@ -84,10 +104,13 @@ function InventoryView({ initial }: { initial: InventoryItem[] }) {
                 <th scope="col" className="px-6 text-right font-normal">
                   재고 수량
                 </th>
+                <th scope="col" className="px-6 text-right font-normal">
+                  안전재고
+                </th>
               </tr>
             </thead>
             <tbody>
-              {items.map((item) => {
+              {visibleItems.map((item) => {
                 const selected = item.productId === selectedId;
                 return (
                   <tr key={item.productId} aria-selected={selected} className={`h-12 border-t border-line ${selected ? "bg-accent-soft" : ""}`}>
@@ -101,9 +124,11 @@ function InventoryView({ initial }: { initial: InventoryItem[] }) {
                       >
                         {item.productName}
                       </button>
+                      {item.lowStock && <span className="ml-2 rounded-sm bg-danger-soft px-2 py-0.5 align-middle text-xs font-bold whitespace-nowrap text-danger">안전재고 미만</span>}
                     </td>
                     <td className="px-3 text-ink-2">{item.categoryName}</td>
                     <td className={`px-6 text-right text-base font-extrabold ${item.quantity === 0 ? "text-ink-3" : "text-ink"}`}>{item.quantity}개</td>
+                    <td className="px-6 text-right text-ink-2">{item.safetyStock}개</td>
                   </tr>
                 );
               })}
