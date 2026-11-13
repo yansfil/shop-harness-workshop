@@ -9,7 +9,7 @@ export const REPO_ROOT = path.resolve(import.meta.dirname, "..", "..", "..");
 
 export const PRACTICE_CONFIG_DIR_NAME = ".claude-autoever";
 
-/** InstructionsLoaded Hook을 붙이는 관찰용 설정. 프로젝트 .claude/가 아니라 --settings로만 넘긴다(D-23). */
+/** InstructionsLoaded Hook을 붙이는 관찰용 설정. 프로젝트 .claude/가 아니라 --settings로만 넘긴다. */
 export const OBSERVER_SETTINGS_PATH = path.join(REPO_ROOT, "tools", "observer", "hooks", "settings.json");
 
 /** 링크·junction을 따라간 실제 경로. 아직 없는 경로는 있는 가장 가까운 상위 폴더까지 풀고 나머지를 붙인다. */
