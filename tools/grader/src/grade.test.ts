@@ -246,6 +246,32 @@ describe("규칙 7 기존 테스트 expect 변경", () => {
     expect(found(gradeSinceStart(root))).toEqual([`test-expect-change ${TEST}:5`]);
   });
 
+  const AUTH = [
+    'it("로그인하면 세션이 생긴다", async () => {',
+    "  const login = await agent.post(ROUTES.login).send({ email, password }).expect(200);",
+    "  expect(login.headers).toBeDefined();",
+    "});",
+    'it("로그아웃하면 세션이 끝난다", async () => {',
+    "  await agent.post(ROUTES.logout).expect(204);",
+    "  await agent.get(ROUTES.me).expect(401);",
+    "  await agent.post(ROUTES.login).send({ email, password }).expect(200);",
+    "  await agent.get(ROUTES.me).expect(200);",
+    "});",
+    "",
+  ].join("\n");
+
+  it("한 테스트 안에서 401과 200 기대를 맞바꾸면 위반", () => {
+    const root = repoAtStart({ [TEST]: AUTH });
+    write(root, { [TEST]: AUTH.replace("me).expect(401)", "me).expect(__OK__)").replace("me).expect(200)", "me).expect(401)").replace("__OK__", "200") });
+    expect(found(gradeSinceStart(root)).length).toBeGreaterThan(0);
+  });
+
+  it("Supertest 요청 준비(.set)만 더하면 통과", () => {
+    const root = repoAtStart({ [TEST]: AUTH });
+    write(root, { [TEST]: AUTH.replace(".send({ email, password }).expect(200);\n  expect(login", '.set("Accept", "application/json").send({ email, password }).expect(200);\n  expect(login') });
+    expect(found(gradeSinceStart(root))).toEqual([]);
+  });
+
   it("기존 테스트 파일을 지우면 위반", () => {
     const root = repoAtStart({ [TEST]: ORIGINAL });
     rmSync(path.join(root, TEST));
