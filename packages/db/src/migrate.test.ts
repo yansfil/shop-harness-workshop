@@ -4,7 +4,7 @@ import path from "node:path";
 import { FixedClock } from "@grabmarket/shared";
 import { afterEach, describe, expect, it } from "vitest";
 import { openMemoryDatabase } from "./connection.ts";
-import { migrate } from "./migrate.ts";
+import { loadMigrations, migrate } from "./migrate.ts";
 import { createTestDatabase } from "./testing.ts";
 
 const clock = new FixedClock("2026-11-01T00:00:00.000Z");
@@ -60,5 +60,24 @@ describe("migrate", () => {
     expect(() => migrate(db, clock, migrationsDir({ "0001_bad.sql": "CREATE TABLE ok (id INTEGER); NOT SQL;" }))).toThrow();
     const rows = db.prepare("SELECT name FROM sqlite_master WHERE name IN ('ok', 'schema_migrations')").all();
     expect(rows).toEqual([{ name: "schema_migrations" }]);
+  });
+
+  it("0002는 기존 이력 행을 그대로 두고 취소 복구 종류를 받는다", () => {
+    const db = openMemoryDatabase();
+    const first = loadMigrations().find((migration) => migration.version === 1);
+    if (first === undefined) throw new Error("0001 파일이 없습니다");
+    migrate(db, clock, migrationsDir({ "0001_init.sql": first.sql }));
+    db.exec(`INSERT INTO categories (id, slug, name, sort_order) VALUES (1, 'food', '식품', 1);
+      INSERT INTO products (id, category_id, base_key, name, description, price, image_path, created_at) VALUES (1, 1, 'k', '감귤', '설명', 1000, '/k.webp', '2026-11-01T00:00:00.000Z');
+      INSERT INTO inventory (product_id, quantity, safety_stock, updated_at) VALUES (1, 10, 5, '2026-11-01T00:00:00.000Z');
+      INSERT INTO inventory_movements (product_id, kind, quantity_delta, quantity_after, memo, idempotency_key, created_at) VALUES (1, 'inbound', 10, 10, '기존 입고', 'key-1', '2026-11-01T00:00:00.000Z');`);
+
+    expect(migrate(db, clock)).toEqual([2]);
+
+    expect(db.prepare("SELECT kind, quantity_delta, memo, idempotency_key FROM inventory_movements").all()).toEqual([
+      { kind: "inbound", quantity_delta: 10, memo: "기존 입고", idempotency_key: "key-1" },
+    ]);
+    db.prepare("INSERT INTO inventory_movements (product_id, kind, quantity_delta, quantity_after, created_at) VALUES (1, 'restock', 2, 12, '2026-11-02T00:00:00.000Z')").run();
+    expect(() => db.prepare("INSERT INTO inventory_movements (product_id, kind, quantity_delta, quantity_after, created_at) VALUES (1, 'other', 1, 13, '2026-11-02T00:00:00.000Z')").run()).toThrow();
   });
 });
