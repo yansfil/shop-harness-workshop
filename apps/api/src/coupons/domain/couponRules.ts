@@ -1,6 +1,6 @@
 // 쿠폰 규칙: 관리자가 정액 할인·최소 주문 금액·유효기간으로 발급하고, 주문당 한 장, 만료·금액 미달은 이유와 함께 거절한다.
 import { isBlank, isValidDate, toDate, toNumber, trim, upper } from "../../legacy/legacyUtils.ts";
-import { COUPON_MESSAGES, couponLine, couponStateText, expiredMessage, minOrderMessage, notStartedMessage } from "../web/couponMessages.ts";
+import { COUPON_MESSAGES, couponLine, couponStateText, expiredMessage, minOrderMessage, notStartedMessage } from "./couponMessages.ts";
 
 export const CODE_PATTERN = /^[A-Z0-9]{4,20}$/;
 
@@ -33,10 +33,10 @@ export function checkApplicable(coupon: any, subtotal: any, alreadyUsed: boolean
   return { ok: true };
 }
 
-/** 할인 금액 (정액) */
-export function discountFor(coupon: any, _subtotal: any): number {
+/** 할인 금액 (정액). 상품 합계를 넘겨 깎지 않는다(결제 금액이 배송비 아래로 내려가지 않게) */
+export function discountFor(coupon: any, subtotal: any): number {
   if (!coupon) return 0;
-  return toNumber(coupon.discount_amount);
+  return Math.min(toNumber(coupon.discount_amount), toNumber(subtotal));
 }
 
 /** 새 쿠폰 입력 검사. 문제가 있으면 { field: [이유] } */
@@ -48,6 +48,7 @@ export function validateNewCoupon(input: any): any {
   if (!CODE_PATTERN.test(code)) errors.code = ["영문 대문자와 숫자 4~20자로 입력해 주세요"];
   if (isBlank(input.discountAmount) || isNaN(Number(input.discountAmount))) errors.discountAmount = ["할인 금액을 입력해 주세요"];
   else if (!Number.isInteger(Number(input.discountAmount))) errors.discountAmount = ["원 단위로 입력해 주세요"];
+  else if (Number(input.discountAmount) <= 0) errors.discountAmount = ["1원 이상으로 입력해 주세요"];
   if (isBlank(input.minOrderAmount)) errors.minOrderAmount = ["최소 주문 금액을 입력해 주세요"];
   else if (!Number.isInteger(Number(input.minOrderAmount)) || Number(input.minOrderAmount) < 0) errors.minOrderAmount = ["0원 이상 원 단위로 입력해 주세요"];
   if (!isValidDate(input.endsAt)) errors.endsAt = ["유효기간을 입력해 주세요"];

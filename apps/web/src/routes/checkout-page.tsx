@@ -11,7 +11,7 @@ import { OrderLines } from "../components/order-lines.tsx";
 import { Page } from "../components/page.tsx";
 import { Bone, EmptyState } from "../components/states.tsx";
 import { SummaryCard } from "../components/summary-box.tsx";
-import { type Benefits, BenefitAmountRows, BenefitsSection, checkoutOrder, rewardFor, useCheckoutQuote } from "../legacy/checkout-benefits.tsx";
+import { type Benefits, BenefitAmountRows, BenefitsSection, checkoutOrder, useCheckoutQuote } from "../legacy/checkout-benefits.tsx";
 import { effectiveQuantity, isOrderable, loadPricedLines, type PricedLine } from "../lib/cart-products.ts";
 import { signedKrw, wonText } from "../legacy/money.ts";
 import { loginPath } from "../lib/login-path.ts";
@@ -115,7 +115,6 @@ function CheckoutView({ rows, direct }: { rows: PricedLine[]; direct: boolean })
         paymentMethod: "virtual",
         couponCode: benefits.couponCode,
         usePoints: benefits.usePoints,
-        rewardPoints: amounts === null ? 0 : rewardFor(amounts.paidAmount),
       });
       clearShippingDraft();
       if (!direct) removeFromCart(items.map((item) => item.productId));

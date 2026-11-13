@@ -2,7 +2,6 @@
 import type { Router } from "express";
 import { bodyOf, created, mustAdmin, mustCustomer, ok, paramInt, toInt, wrap } from "../../legacy/legacyUtils.ts";
 import * as couponManager from "../couponManager.ts";
-import { findById } from "../infra/couponDao.ts";
 
 export function registerCouponRoutes(router: Router): void {
   // 주문서: 내 쿠폰
@@ -40,7 +39,7 @@ export function registerCouponRoutes(router: Router): void {
     wrap((req, res) => {
       const admin = mustAdmin(res);
       const result = couponManager.create(admin, bodyOf(req));
-      created(res, { ...result, coupon: findById(result.id) });
+      created(res, { ...result, coupon: couponManager.findCoupon(result.id) });
     }),
   );
 

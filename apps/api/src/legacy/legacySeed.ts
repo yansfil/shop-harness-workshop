@@ -8,7 +8,6 @@ import {
   MINUTE,
   RETURN_REASONS,
   addDays,
-  floorWon,
   initLegacy,
   itemSummary,
   makeReturnNo,
@@ -21,6 +20,7 @@ import {
 import { render } from "../notifications/domain/notificationTemplates.ts";
 import { daily } from "../settlement/settlementService.ts";
 import { restoreReturnedStock } from "../returns/application/stockRestore.ts";
+import { calcRewardPoints } from "../points/domain/pointPolicy.ts";
 
 const SEED = 20_261_114;
 
@@ -158,7 +158,7 @@ export function seedLegacyData(db: any, services: any, baseDate: Date): void {
       ledger.push({ user_id: userId, kind: "use", amount: -points, balance_after: balances[userId], order_id: o.id, memo: null, expires_at: null, expired: 0, created_at: at });
     }
     const paid = payable - points;
-    const reward = floorWon(paid * CONFIG.POINT_RATE);
+    const reward = calcRewardPoints(paid);
     payments.push({ order_id: o.id, coupon_id: coupon ? coupon.id : null, coupon_discount: discount, point_used: points, paid_amount: paid, reward_points: reward, created_at: at });
     earn(userId, reward, ev.at, o.id, null);
   }

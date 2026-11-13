@@ -3,7 +3,6 @@ import type { Router } from "express";
 import { mustAdmin, mustCustomer, ok, wrap, bodyOf, paramInt, toInt, customerLabel, loadUser, pointText } from "../../legacy/legacyUtils.ts";
 import * as pointManager from "../pointManager.ts";
 import { maxUsablePoints } from "../domain/pointPolicy.ts";
-import { sumByKind, topHolders, totalOutstanding } from "../infra/pointDao.ts";
 
 export function registerPointRoutes(router: Router): void {
   // 내 포인트 잔액과 내역
@@ -31,13 +30,13 @@ export function registerPointRoutes(router: Router): void {
     "/api/admin/points/summary",
     wrap((_req, res) => {
       mustAdmin(res);
-      const holders = topHolders(20).map((h: any) => ({
+      const holders = pointManager.topHolders(20).map((h: any) => ({
         id: h.user_id,
         user: customerLabel(h),
         name: h.name,
         balance: toInt(h.balance),
       }));
-      ok(res, { outstanding: totalOutstanding(), holders: holders });
+      ok(res, { outstanding: pointManager.totalOutstanding(), holders: holders });
     }),
   );
 
@@ -48,7 +47,7 @@ export function registerPointRoutes(router: Router): void {
       mustAdmin(res);
       const target = paramInt(req, "memberId");
       const user = loadUser(target);
-      ok(res, { user: user ? { id: user.id, name: user.name, label: customerLabel(user) } : null, kinds: sumByKind(target), ...pointManager.history(target) });
+      ok(res, { user: user ? { id: user.id, name: user.name, label: customerLabel(user) } : null, kinds: pointManager.sumByKind(target), ...pointManager.history(target) });
     }),
   );
 

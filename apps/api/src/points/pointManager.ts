@@ -205,3 +205,18 @@ export function history(userId: any): any {
 export function onPointsChanged(userId: any, reason: string): void {
   emit("points.changed", { userId: Number(userId), reason: reason, balance: getBalance(userId) });
 }
+
+/** 관리자: 포인트를 많이 가진 고객 */
+export function topHolders(limit: number): any[] {
+  return dao.topHolders(limit);
+}
+
+/** 관리자: 남아 있는 포인트 총액 */
+export function totalOutstanding(): number {
+  return dao.totalOutstanding();
+}
+
+/** 관리자: 고객 한 명의 종류별 합계 */
+export function sumByKind(userId: any): any {
+  return dao.sumByKind(userId);
+}

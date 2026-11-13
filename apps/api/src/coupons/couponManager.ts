@@ -191,3 +191,8 @@ export function endingToday(): number {
     return t >= start && t <= end;
   }).length;
 }
+
+/** 쿠폰 한 장 (관리자 발급 응답용) */
+export function findCoupon(couponId: any): any {
+  return dao.findById(couponId);
+}

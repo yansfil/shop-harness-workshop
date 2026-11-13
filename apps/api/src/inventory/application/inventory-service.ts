@@ -85,11 +85,11 @@ export class InventoryService {
     });
   }
 
-  /** 취소·반품으로 돌아온 수량을 되돌린다. 주문 번호와 사유를 이력에 남긴다. 주문 트랜잭션 안에서 부른다. */
-  restoreForOrder(orderId: number, lines: StockLine[], memo: string): void {
+  /** 취소·반품으로 돌아온 수량을 되돌린다. 주문 번호와 사유를 이력에 남긴다. 주문 트랜잭션 안에서 부른다. at이 없으면 지금 시각. */
+  restoreForOrder(orderId: number, lines: StockLine[], memo: string, restoredAt?: Date): void {
     this.#uow.run(() => {
       const quantities = this.#inventory.quantities(lines.map((line) => line.productId));
-      const at = this.#clock.now();
+      const at = restoredAt ?? this.#clock.now();
       for (const line of lines) {
         const after = (quantities.get(line.productId) ?? 0) + line.quantity;
         quantities.set(line.productId, after);
