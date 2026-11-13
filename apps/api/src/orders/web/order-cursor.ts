@@ -6,12 +6,15 @@ export function encodeOrderCursor(position: OrderPosition): string {
   return Buffer.from(`${position.createdAt.toISOString()}|${position.id}`).toString("base64url");
 }
 
-/** 형식이 틀린 커서는 VALIDATION_FAILED(400)로 거절한다. */
+/** 형식이 틀린 커서는 VALIDATION_FAILED(400)로 거절한다. 시각|id 두 칸만 받고, id는 안전하게 표현되는 양의 정수여야 한다. */
 export const OrderCursorSchema = z.string().transform((value, ctx): OrderPosition => {
-  const [at = "", id = ""] = Buffer.from(value, "base64url").toString().split("|");
+  const parts = Buffer.from(value, "base64url").toString().split("|");
+  const [at = "", id = ""] = parts;
   const createdAt = new Date(at);
   const orderId = Number(id);
-  if (Number.isNaN(createdAt.getTime()) || createdAt.toISOString() !== at || !Number.isInteger(orderId) || orderId <= 0) {
+  const wellFormed =
+    parts.length === 2 && !Number.isNaN(createdAt.getTime()) && createdAt.toISOString() === at && /^[1-9]\d*$/.test(id) && Number.isSafeInteger(orderId);
+  if (!wellFormed) {
     ctx.addIssue({ code: "custom", message: "올바르지 않은 커서입니다" });
     return z.NEVER;
   }

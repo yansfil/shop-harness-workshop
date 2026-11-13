@@ -113,6 +113,23 @@ describe("관리자 주문 목록: 커서 방식 페이지 나누기", () => {
     const response = await admin.get(ROUTES.adminOrders).query({ cursor: "아무거나" }).expect(400);
     expect(ApiErrorResponseSchema.parse(response.body).error.code).toBe("VALIDATION_FAILED");
   });
+
+  it.each([
+    ["뒤에 값이 더 붙은 커서", "2026-11-14T03:00:00.000Z|1|뒤에붙은값"],
+    ["안전하지 않은 큰 id", "2026-11-14T03:00:00.000Z|9007199254740992"],
+    ["id가 0", "2026-11-14T03:00:00.000Z|0"],
+    ["id가 소수", "2026-11-14T03:00:00.000Z|1.5"],
+    ["id가 지수 표기", "2026-11-14T03:00:00.000Z|1e3"],
+    ["id가 앞에 0이 붙음", "2026-11-14T03:00:00.000Z|01"],
+    ["id가 비어 있음", "2026-11-14T03:00:00.000Z|"],
+    ["구분자가 없음", "2026-11-14T03:00:00.000Z"],
+  ])("커서가 모양을 벗어나면(%s) 400으로 거절한다", async (_name, raw) => {
+    const { app } = createTestApp();
+    const admin = await loginAs(app, ACCOUNT.admin);
+    const cursor = Buffer.from(raw).toString("base64url");
+    const response = await admin.get(ROUTES.adminOrders).query({ cursor }).expect(400);
+    expect(ApiErrorResponseSchema.parse(response.body).error.code).toBe("VALIDATION_FAILED");
+  });
 });
 
 describe("관리자 주문 목록: 경계와 조합", () => {
