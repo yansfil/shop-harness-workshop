@@ -11,7 +11,7 @@ function inlineJson(value: unknown): string {
   return JSON.stringify(value).replace(/</g, "\\u003c");
 }
 
-export function exportSessions(store: SessionStore, repoRoot: string, outDir: string): string {
+export function exportSessions(store: SessionStore, outDir: string): string {
   store.refresh();
   const sessions = store.list();
   const responses: Record<string, unknown> = {
@@ -22,7 +22,7 @@ export function exportSessions(store: SessionStore, repoRoot: string, outDir: st
     responses[`/api/sessions/${id}/instructions`] = store.instructions(id);
     if (branch !== null) responses[`/api/sessions/${id}/compare`] = store.compare(id);
   }
-  const snapshot = { exportedFrom: path.basename(repoRoot), responses };
+  const snapshot = { responses };
 
   const html = readFileSync(path.join(WEB_DIR, "index.html"), "utf8")
     .replace('<link rel="stylesheet" href="/app.css" />', () => `<style>\n${readFileSync(path.join(WEB_DIR, "app.css"), "utf8")}\n</style>`)

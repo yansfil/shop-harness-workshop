@@ -35,7 +35,7 @@ export interface SessionDetail extends SessionSummary {
   unreadable: UnreadableLine[];
 }
 
-export type InstructionResult = { status: "missing" } | ({ status: "ok" } & InstructionMap);
+export type InstructionResult = { status: "missing" } | ({ status: "ok"; repoName: string } & InstructionMap);
 
 export class SessionStore {
   readonly #paths: ObserverPaths;
@@ -104,7 +104,7 @@ export class SessionStore {
     const logPath = path.join(this.#paths.instructionsDir, `${id}.jsonl`);
     if (!existsSync(logPath)) return { status: "missing" };
     const map = buildInstructionMap(readFileSync(logPath, "utf8"), this.#repoRoot, listInstructionFiles(this.#repoRoot), file.transcript.requests);
-    return { status: "ok", ...map };
+    return { status: "ok", repoName: path.basename(this.#repoRoot), ...map };
   }
 
   #summary(id: string): SessionSummary {

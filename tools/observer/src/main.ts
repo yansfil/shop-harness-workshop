@@ -55,7 +55,7 @@ const paths = resolvePaths();
 const store = new SessionStore(paths, REPO_ROOT);
 
 if (options.exportDir !== null) {
-  const file = exportSessions(store, REPO_ROOT, options.exportDir);
+  const file = exportSessions(store, options.exportDir);
   console.log(`세션 기록 ${store.list().length}개를 내보냈어요: ${file}`);
 } else {
   let server;

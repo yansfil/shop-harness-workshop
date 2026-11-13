@@ -354,7 +354,7 @@ function instructionsTab() {
   const outside = map.files.filter((file) => !file.insideRepo);
   const loaded = map.files.filter((file) => file.loads.length > 0).length;
   const warn = map.unreadable.length > 0 ? `<span class="badge warn" title="${escapeHtml(map.unreadable.map((p) => `줄 ${p.line}: ${p.reason}`).join("\n"))}">읽지 못한 기록 줄 ${map.unreadable.length}개 (줄 ${map.unreadable.map((p) => p.line).join(", ")})</span>` : "";
-  const rows = [`<tr class="folder"><td colspan="5"><span class="icon"></span>${escapeHtml(snapshot?.exportedFrom ?? "레포")}/</td></tr>`, ...instructionRows(buildTree(inside), 1)];
+  const rows = [`<tr class="folder"><td colspan="5"><span class="icon"></span>${escapeHtml(map.repoName)}/</td></tr>`, ...instructionRows(buildTree(inside), 1)];
   if (outside.length > 0) {
     rows.push('<tr class="folder"><td colspan="5"><span class="icon"></span>레포 밖</td></tr>');
     for (const file of outside) rows.push(...instructionRows({ folders: new Map(), files: [{ ...file, name: file.path }] }, 1));
@@ -370,7 +370,7 @@ function instructionsTab() {
 // ── 채점 탭 ───────────────────────────────────────────
 
 function gradeToggle() {
-  return `<div class="toggle end" role="group" aria-label="채점 범위">
+  return `<div class="toggle" role="group" aria-label="채점 범위">
     <button type="button" data-grade-all="0" aria-pressed="${!state.gradeAll}">시작 이후 바뀐 것</button>
     <button type="button" data-grade-all="1" aria-pressed="${state.gradeAll}">전체 (--all)</button>
   </div>`;
@@ -378,9 +378,9 @@ function gradeToggle() {
 
 function gradeTab() {
   if (snapshot !== null) return '<section class="panel empty"><h2>내보낸 기록에는 채점이 없어요</h2><p>채점은 레포에서 npm run grade로 다시 돌려 주세요.</p></section>';
-  if (state.grade === null || state.gradeLoading) return `<div class="heading"><span>채점하는 중…</span>${gradeToggle()}</div>`;
+  if (state.grade === null || state.gradeLoading) return `<div class="heading"><span>채점하는 중…</span><span class="end"></span>${gradeToggle()}</div>`;
   if (state.grade.status === "error") {
-    return `<div class="heading"><strong>채점할 수 없어요</strong>${gradeToggle()}</div>
+    return `<div class="heading"><strong>채점할 수 없어요</strong><span class="end"></span>${gradeToggle()}</div>
       <section class="panel empty"><h2>채점할 수 없어요</h2><p>${escapeHtml(state.grade.message)}</p>
       <div class="actions"><button type="button" class="button" data-grade-all="1">전체 (--all)로 채점</button></div></section>`;
   }
@@ -390,9 +390,9 @@ function gradeTab() {
   const heading =
     result.mode === "all"
       ? `<div class="heading"><span class="grade-big${total === 0 ? " pass" : ""} num">${total}개</span><strong>레포 전체 위반</strong><span>· 파일 ${result.filesChecked}개 검사</span>
-          <button type="button" class="button" data-regrade>다시 채점</button>${gradeToggle()}</div>`
+          <button type="button" class="link end" data-regrade>다시 채점</button>${gradeToggle()}</div>`
       : `<div class="heading"><strong>위반 ${total}개</strong><span>${total > 0 ? `· 규칙 6개 중 ${brokenRules}개에서 ` : ""}· ${escapeHtml(result.tag)} 이후 바뀐 파일 ${result.filesChecked}개</span>
-          <button type="button" class="button" data-regrade>다시 채점</button>${gradeToggle()}</div>`;
+          <button type="button" class="link end" data-regrade>다시 채점</button>${gradeToggle()}</div>`;
   const rules = result.rules
     .map((rule) => {
       if (rule.count === null) return `<li class="clean"><span class="na">–</span><span class="title">${escapeHtml(rule.title)}</span><span class="note">해당 없음</span></li>`;

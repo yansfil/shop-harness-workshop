@@ -1,5 +1,5 @@
 // 채점: 기본은 시작 태그(start/<브랜치>) 이후 바뀐 코드, --all은 레포 전체.
-import { existsSync, readFileSync } from "node:fs";
+import { lstatSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { allFiles, changesSince, fileAtTag, startTag, type FileChange } from "./git.ts";
 import { RULES, checkContent, expectLineRanges, isMigrationFile, isTestFile, type RuleId, type Violation } from "./rules.ts";
@@ -20,9 +20,10 @@ export interface GradeResult {
   rules: RuleCount[];
 }
 
+/** 지금 작업 트리의 파일 내용. 지웠거나 일반 파일이 아니면(폴더를 가리키는 링크 등) null. */
 function readCurrent(root: string, file: string): string | null {
-  const full = path.join(root, file);
-  return existsSync(full) ? readFileSync(full, "utf8") : null;
+  const stat = lstatSync(path.join(root, file), { throwIfNoEntry: false });
+  return stat?.isFile() === true ? readFileSync(path.join(root, file), "utf8") : null;
 }
 
 function sortViolations(violations: Violation[]): Violation[] {
@@ -78,7 +79,7 @@ export function gradeSinceStart(root: string): GradeResult {
 }
 
 export function gradeAll(root: string): GradeResult {
-  const files = allFiles(root).filter((file) => existsSync(path.join(root, file)));
+  const files = allFiles(root).filter((file) => lstatSync(path.join(root, file), { throwIfNoEntry: false })?.isFile() === true);
   const violations: Violation[] = [];
   for (const file of files) {
     const content = readCurrent(root, file);
