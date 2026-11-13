@@ -42,7 +42,7 @@ describe("관리자 재고 화면의 안전재고 알림", () => {
     expect(within(rowOf("제주 감귤")).queryByText("안전재고 미만")).not.toBeInTheDocument();
   });
 
-  it("미만이 2개면 알림 줄에 개수를 보이고, 0개면 알림 줄이 없다", async () => {
+  it("안전재고 미만이 2개면 알림 줄에 개수를 보인다", async () => {
     openInventory(SAMPLE);
     expect(await screen.findByRole("button", { name: "안전재고 미만 2개" })).toBeInTheDocument();
   });
