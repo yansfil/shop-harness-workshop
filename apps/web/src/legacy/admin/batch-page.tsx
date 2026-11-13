@@ -9,6 +9,7 @@ import { streamed } from "../../lib/streamed.ts";
 import { errorText, legacyGet, legacyPost } from "../legacyApi.ts";
 import { ConfirmDialog, Notice, PageTitle, Panel, TableBox, TableSkeleton, Tag, Td, Th, fieldClass, labelClass } from "../ui.tsx";
 
+const PAGE_ROWS = 30;
 const STATE_TEXT: any = { success: "성공", failed: "실패", skipped: "건너뜀", running: "실행 중" };
 const STATE_TONE: any = { success: "green", failed: "red", skipped: "yellow", running: "blue" };
 
@@ -36,6 +37,7 @@ function BatchView({ job, history, health }: { job: string; history: any; health
   const [running, setRunning] = useState<string | null>(null);
   const [pausing, setPausing] = useState<any>(null);
   const [logRunId, setLogRunId] = useState<number | null>(null);
+  const [shown, setShown] = useState(PAGE_ROWS);
 
   async function runNow(key: string, name: string) {
     setRunning(key);
@@ -173,7 +175,7 @@ function BatchView({ job, history, health }: { job: string; history: any; health
                 </tr>
               </thead>
               <tbody>
-                {history.runs.map((r: any) => (
+                {history.runs.slice(0, shown).map((r: any) => (
                   <tr
                     key={r.id}
                     onClick={() => {
@@ -200,6 +202,19 @@ function BatchView({ job, history, health }: { job: string; history: any; health
               </tbody>
             </TableBox>
           )}
+          {history.runs.length > shown && (
+            <div className="border-t border-line px-4 py-3 text-center md:px-6">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  setShown(shown + PAGE_ROWS);
+                }}
+              >
+                더 보기 ({shown}/{history.runs.length})
+              </Button>
+            </div>
+          )}
         </Panel>
         <RunLogPanel runId={logRunId} />
       </div>
@@ -223,29 +238,31 @@ function BatchView({ job, history, health }: { job: string; history: any; health
 function RunLogPanel({ runId }: { runId: number | null }) {
   const logs = useAsync(runId === null ? null : "logs:" + runId, () => legacyGet("/api/admin/batch-runs/" + runId + "/logs"));
   return (
-    <Panel title="실행 로그">
-      {runId === null && <p className="px-4 py-5 text-sm text-ink-3 md:px-6">실행 기록을 누르면 로그가 보여요.</p>}
-      {logs.status === "loading" && <p className="px-4 py-5 text-sm text-ink-3 md:px-6">불러오는 중이에요.</p>}
-      {logs.status === "error" && <p className="px-4 py-5 text-sm text-danger md:px-6">{errorText(logs.error)}</p>}
-      {logs.status === "ready" && (
-        <div className="px-4 py-4 md:px-6">
-          <p className="mb-2 text-sm font-bold text-ink">
-            {logs.data.jobName} · {logs.data.startedAtText}
-          </p>
-          {logs.data.logs.length === 0 ? (
-            <p className="text-xs-plus text-ink-3">남긴 로그가 없어요.</p>
-          ) : (
-            <ol className="flex flex-col gap-1 font-mono text-xs">
-              {logs.data.logs.map((l: any) => (
-                <li key={l.id} className={l.level === "error" ? "text-danger" : "text-ink-2"}>
-                  {l.atText} {l.message}
-                </li>
-              ))}
-            </ol>
-          )}
-        </div>
-      )}
-    </Panel>
+    <div className="lg:sticky lg:top-4">
+      <Panel title="실행 로그">
+        {runId === null && <p className="px-4 py-5 text-sm text-ink-3 md:px-6">실행 기록을 누르면 로그가 보여요.</p>}
+        {logs.status === "loading" && <p className="px-4 py-5 text-sm text-ink-3 md:px-6">불러오는 중이에요.</p>}
+        {logs.status === "error" && <p className="px-4 py-5 text-sm text-danger md:px-6">{errorText(logs.error)}</p>}
+        {logs.status === "ready" && (
+          <div className="px-4 py-4 md:px-6">
+            <p className="mb-2 text-sm font-bold text-ink">
+              {logs.data.jobName} · {logs.data.startedAtText}
+            </p>
+            {logs.data.logs.length === 0 ? (
+              <p className="text-xs-plus text-ink-3">남긴 로그가 없어요.</p>
+            ) : (
+              <ol className="flex flex-col gap-1 font-mono text-xs">
+                {logs.data.logs.map((l: any) => (
+                  <li key={l.id} className={l.level === "error" ? "text-danger" : "text-ink-2"}>
+                    {l.atText} {l.message}
+                  </li>
+                ))}
+              </ol>
+            )}
+          </div>
+        )}
+      </Panel>
+    </div>
   );
 }
 

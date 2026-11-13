@@ -1,6 +1,7 @@
 // 내 배송 모아 보기
+import { useState } from "react";
 import { Link, useLoaderData } from "react-router";
-import { LinkButton } from "../components/button.tsx";
+import { Button, LinkButton } from "../components/button.tsx";
 import { Loaded } from "../components/loaded.tsx";
 import { Page } from "../components/page.tsx";
 import { EmptyState } from "../components/states.tsx";
@@ -54,9 +55,7 @@ export function ShipmentsPage() {
                 </Panel>
               )}
               {data.arrived.length > 0 && (
-                <Panel title="도착한 상품">
-                  <ShipmentList rows={data.arrived} />
-                </Panel>
+                <ArrivedPanel rows={data.arrived} />
               )}
             </div>
           )
@@ -81,7 +80,7 @@ function ShipmentList({ rows }: { rows: any[] }) {
             </span>
             <span className="grid gap-1" style={{ gridTemplateColumns: "repeat(" + s.stepCount + ", minmax(0, 1fr))" }} aria-label={s.stepText}>
               {Array.from({ length: s.stepCount }).map((_, i) => (
-                <span key={i} aria-hidden="true" className={`h-1.5 rounded-sm ${i < s.stepIndex ? "bg-ink" : i === s.stepIndex ? "border border-ink bg-accent" : "bg-line"}`} />
+                <span key={i} aria-hidden="true" className={`h-1.5 rounded-sm ${i < s.stepIndex || s.stepIndex === s.stepCount - 1 ? "bg-ink" : i === s.stepIndex ? "border border-ink bg-accent" : "bg-line"}`} />
               ))}
             </span>
             <span className="text-xs-plus text-ink-2">
@@ -91,5 +90,27 @@ function ShipmentList({ rows }: { rows: any[] }) {
         </li>
       ))}
     </ul>
+  );
+}
+
+function ArrivedPanel({ rows }: { rows: any[] }) {
+  const [shown, setShown] = useState(10);
+  return (
+    <Panel title="도착한 상품">
+      <ShipmentList rows={rows.slice(0, shown)} />
+      {rows.length > shown && (
+        <div className="border-t border-line px-4 py-3 text-center md:px-6">
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => {
+              setShown(shown + 10);
+            }}
+          >
+            더 보기 ({shown}/{rows.length})
+          </Button>
+        </div>
+      )}
+    </Panel>
   );
 }

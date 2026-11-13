@@ -75,42 +75,71 @@ function PointsView({ points, expiring }: { points: any; expiring: any }) {
         {rows.length === 0 ? (
           <EmptyState title="포인트 내역이 없어요" hint="주문하면 결제 금액의 1%가 쌓여요" />
         ) : (
-          <TableBox>
-            <thead>
-              <tr className="border-b border-line">
-                <Th>일시</Th>
-                <Th>내용</Th>
-                <Th>구분</Th>
-                <Th right>포인트</Th>
-                <Th right>잔액</Th>
-              </tr>
-            </thead>
-            <tbody>
+          <>
+            <ul className="md:hidden">
               {rows.map((h: any) => (
-                <tr key={h.id} className="border-b border-line last:border-b-0">
-                  <Td className="whitespace-nowrap text-ink-2">{h.createdAtText}</Td>
-                  <Td>
-                    {h.orderId ? (
-                      <Link to={"/orders/" + h.orderId} className="underline underline-offset-2">
-                        {h.description}
-                      </Link>
-                    ) : (
-                      h.description
-                    )}
-                  </Td>
-                  <Td>
-                    <Tag tone={KIND_TONE[h.kind] || "gray"}>{h.kindText}</Tag>
-                  </Td>
-                  <Td right className={h.amount > 0 ? "font-bold" : "text-ink-2"}>
-                    {signedPoint(h.amount)}
-                  </Td>
-                  <Td right className="text-ink-2">
-                    {pointText(h.balanceAfter)}
-                  </Td>
-                </tr>
+                <li key={h.id} className="flex items-center justify-between gap-3 border-b border-line px-4 py-3 last:border-b-0">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm text-ink">
+                      {h.orderId ? (
+                        <Link to={"/orders/" + h.orderId} className="underline underline-offset-2">
+                          {h.description}
+                        </Link>
+                      ) : (
+                        h.description
+                      )}
+                    </p>
+                    <p className="mt-1 flex items-center gap-2 text-xs text-ink-3">
+                      <Tag tone={KIND_TONE[h.kind] || "gray"}>{h.kindText}</Tag>
+                      {h.createdAtText}
+                    </p>
+                  </div>
+                  <div className="shrink-0 text-right tabular-nums">
+                    <p className={`text-sm ${h.amount > 0 ? "font-bold text-ink" : "text-ink-2"}`}>{signedPoint(h.amount)}</p>
+                    <p className="mt-1 text-xs text-ink-3">잔액 {pointText(h.balanceAfter)}</p>
+                  </div>
+                </li>
               ))}
-            </tbody>
-          </TableBox>
+            </ul>
+            <div className="hidden md:block">
+              <TableBox>
+                <thead>
+                  <tr className="border-b border-line">
+                    <Th>일시</Th>
+                    <Th>내용</Th>
+                    <Th>구분</Th>
+                    <Th right>포인트</Th>
+                    <Th right>잔액</Th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((h: any) => (
+                    <tr key={h.id} className="border-b border-line last:border-b-0">
+                      <Td className="whitespace-nowrap text-ink-2">{h.createdAtText}</Td>
+                      <Td>
+                        {h.orderId ? (
+                          <Link to={"/orders/" + h.orderId} className="underline underline-offset-2">
+                            {h.description}
+                          </Link>
+                        ) : (
+                          h.description
+                        )}
+                      </Td>
+                      <Td>
+                        <Tag tone={KIND_TONE[h.kind] || "gray"}>{h.kindText}</Tag>
+                      </Td>
+                      <Td right className={h.amount > 0 ? "font-bold" : "text-ink-2"}>
+                        {signedPoint(h.amount)}
+                      </Td>
+                      <Td right className="text-ink-2">
+                        {pointText(h.balanceAfter)}
+                      </Td>
+                    </tr>
+                  ))}
+                </tbody>
+              </TableBox>
+            </div>
+          </>
         )}
       </Panel>
     </div>

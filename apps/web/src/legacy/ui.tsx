@@ -127,7 +127,7 @@ export function Th({ children, right = false, className = "" }: { children?: Rea
 }
 
 export function Td({ children, right = false, className = "" }: { children?: ReactNode; right?: boolean; className?: string }) {
-  return <td className={`h-12 px-3 text-sm text-ink first:pl-4 last:pr-4 md:first:pl-6 md:last:pr-6 ${right ? "text-right tabular-nums" : ""} ${className}`}>{children}</td>;
+  return <td className={`h-12 px-3 text-sm text-ink first:pl-4 last:pr-4 md:first:pl-6 md:last:pr-6 ${right ? "text-right whitespace-nowrap tabular-nums" : ""} ${className}`}>{children}</td>;
 }
 
 /** 가로로 넘치면 표 안에서만 밀리게 */
