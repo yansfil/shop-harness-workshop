@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>실습 관찰 도구</title>
+    <link rel="stylesheet" href="/app.css" />
+  </head>
+  <body>
+    <header class="top">
+      <h1 class="brand">실습 관찰 도구</h1>
+      <nav class="tabs" aria-label="화면">
+        <button type="button" class="tab" data-tab="session">세션</button>
+        <button type="button" class="tab" data-tab="instructions">지침 지도</button>
+        <button type="button" class="tab" data-tab="grade">채점</button>
+      </nav>
+      <span id="live" class="live" hidden></span>
+    </header>
+    <main id="app" class="page"></main>
+    <script src="/app.js" defer></script>
+  </body>
+</html>
