@@ -5,6 +5,7 @@
 import { spawnSync } from "node:child_process";
 import { createRequire } from "node:module";
 import path from "node:path";
+import { worktreeId } from "./worktree-id.mjs";
 
 const root = path.resolve(import.meta.dirname, "..");
 const webDir = path.join(root, "apps", "web");
@@ -56,6 +57,16 @@ if (selected.length === 0) {
   process.exit(2);
 }
 
+// 전체 실행이면 검사하는 내용의 지문을 단계를 돌리기 전에 만든다. 통과 줄에 찍어 Stop Hook이 비교한다.
+let tree = null;
+if (only === null) {
+  try {
+    tree = worktreeId(root);
+  } catch (error) {
+    console.error(`[verify] 작업 트리 지문을 만들지 못했습니다(${error.message}). 검사는 계속하지만 Stop Hook은 이 통과를 확인할 수 없습니다.`);
+  }
+}
+
 for (const [index, step] of selected.entries()) {
   console.log(`\n[verify ${index + 1}/${selected.length}] ${step.name}`);
   const code = step.run();
@@ -65,3 +76,4 @@ for (const [index, step] of selected.entries()) {
   }
 }
 console.log(`\n[verify] 통과: ${selected.map((step) => step.name).join(" → ")}`);
+if (tree !== null) console.log(`[verify] 전체 통과 · 작업 트리 ${tree}`);
