@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "deny": [
+      "Read(./.env)",
+      "Edit(./.env)",
+      "Write(./.env)",
+      "Edit(./data/**)",
+      "Write(./data/**)",
+      "Bash(sqlite3 *)",
+      "Bash(npm run db:reset)"
+    ]
+  }
+}
