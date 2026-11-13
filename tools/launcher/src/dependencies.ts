@@ -1,5 +1,5 @@
 // node_modules가 지금 package-lock.json대로 설치돼 있는지를 내용으로 판정한다.
-// 파일 시각은 보지 않는다: 압축 해제·git checkout·merge·touch는 내용이 같아도 시각을 바꾸기 때문이다(B7).
+// 파일 시각은 보지 않는다: 압축 해제·git checkout·merge·touch는 내용이 같아도 시각을 바꾸기 때문이다.
 // 비교 대상은 npm이 설치 뒤 node_modules/.package-lock.json(숨은 lock)에 남기는 packages 표다.
 // 숨은 lock에는 이 컴퓨터에 설치되지 않은 optional 패키지(다른 OS·CPU용 바이너리 등)가 없다.
 // 그래서 package-lock.json에 있는데 숨은 lock에 없는 패키지는, 이 컴퓨터(OS·CPU)에 맞는 optional이 아니면 건너뛴다.
@@ -89,7 +89,7 @@ function differingField(wanted: LockedPackage, installed: LockedPackage): string
   return null;
 }
 
-/** Release에 node_modules가 든 압축 파일이 있는 컴퓨터: Windows x64와 Mac arm64뿐이다(D-35). */
+/** Release에 node_modules가 든 압축 파일이 있는 컴퓨터: Windows x64와 Mac arm64뿐이다. */
 const RELEASE_PLATFORMS: readonly Platform[] = [
   { os: "win32", cpu: "x64" },
   { os: "darwin", cpu: "arm64" },

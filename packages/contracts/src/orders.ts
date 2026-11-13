@@ -154,7 +154,7 @@ export type AdminOrderRow = z.infer<typeof AdminOrderRowSchema>;
 
 /**
  * GET /api/admin/orders (관리자). 전체 주문을 한 번에, 최신순.
- * 필터·검색·페이지 나누기는 일부러 없다(D1-A 과제). 고객이면 403 FORBIDDEN.
+ * 필터·검색·페이지 나누기는 아직 없다(실습 과제). 고객이면 403 FORBIDDEN.
  */
 export const AdminOrderListResponseSchema = z.object({ orders: z.array(AdminOrderRowSchema) });
 export type AdminOrderListResponse = z.infer<typeof AdminOrderListResponseSchema>;

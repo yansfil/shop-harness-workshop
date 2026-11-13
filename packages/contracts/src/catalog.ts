@@ -47,7 +47,7 @@ export type ProductSort = z.infer<typeof ProductSortSchema>;
 
 /**
  * GET /api/products 쿼리 (로그인 불필요). 모두 선택이고 조건은 AND로 묶인다.
- * 결과는 한 번에 모두 준다. 페이지 나누기·더보기는 없다(D-42).
+ * 결과는 한 번에 모두 준다. 페이지 나누기·더보기는 없다.
  */
 export const ProductSearchQuerySchema = z
   .object({
