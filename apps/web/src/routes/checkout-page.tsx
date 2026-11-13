@@ -13,7 +13,7 @@ import { Bone, EmptyState } from "../components/states.tsx";
 import { SummaryCard } from "../components/summary-box.tsx";
 import { type Benefits, BenefitAmountRows, BenefitsSection, checkoutOrder, rewardFor, useCheckoutQuote } from "../legacy/checkout-benefits.tsx";
 import { effectiveQuantity, isOrderable, loadPricedLines, type PricedLine } from "../lib/cart-products.ts";
-import { wonText } from "../legacy/money.ts";
+import { signedKrw, wonText } from "../legacy/money.ts";
 import { loginPath } from "../lib/login-path.ts";
 import { type CartLine, removeFromCart, selectedCartLines } from "../state/cart.ts";
 import { useRootData } from "../state/root-data.ts";
@@ -254,8 +254,9 @@ function CheckoutView({ rows, direct }: { rows: PricedLine[]; direct: boolean })
       <div className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-ground p-4 lg:hidden">
         {pay.status === "failed" && <PayFailure error={pay.error} />}
         <div className="flex items-center justify-between text-xs-plus text-ink-2">
-          <span>상품 합계 {amounts !== null ? krw(amounts.subtotal) : "-"}</span>
-          <span>배송비 {amounts !== null ? krw(amounts.shippingFee) : "-"}</span>
+          <span>상품 합계 {amounts !== null ? wonText(amounts.subtotal) : "-"}</span>
+          <span>배송비 {amounts !== null ? wonText(amounts.shippingFee) : "-"}</span>
+          {amounts !== null && amounts.couponDiscount + amounts.usePoints !== 0 && <span>할인 {signedKrw(-(amounts.couponDiscount + amounts.usePoints))}</span>}
         </div>
         <div className="mt-1 mb-3 flex items-center justify-between">
           <span className="text-sm font-bold text-ink">결제 금액</span>
