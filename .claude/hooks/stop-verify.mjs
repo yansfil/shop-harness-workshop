@@ -1,11 +1,18 @@
-// Stop Hook: 파일을 고쳤는데 그 뒤에 `npm run verify`가 통과한 적이 없으면 끝내기를 막는다.
-// 세션 기록(transcript)에서 "마지막 코드 수정"과 "마지막 verify 통과"의 순서를 비교한다.
+// Stop Hook: 이 세션이 코드를 바꿨는데, 지금 작업 트리가 마지막으로 전체 `npm run verify`를 통과한 작업 트리와 다르면 끝내기를 막는다.
+//
+// - "코드를 바꿨다": Write·Edit 등으로 문서(.md)가 아닌 파일을 고쳤거나, 읽기 전용이 아닌 Bash 명령을 돌렸다(bash-command.mjs가 판정).
+// - "전체 verify 통과": verify를 부른 Bash 결과에 `[verify] 전체 통과 · 작업 트리 <id>`가 있다.
+//   scripts/verify.mjs는 `--only` 없이 다섯 단계를 모두 통과했을 때만 이 줄을 찍는다.
+// - 작업 트리 비교: scripts/worktree-id.mjs의 지문(내용 기준 git 트리 id). Bash로 고친 것도, 커밋한 것도 내용으로 비교한다.
 import { readFileSync } from "node:fs";
+import path from "node:path";
+import { worktreeId } from "../../scripts/worktree-id.mjs";
+import { changesFiles, commandName, simpleCommands } from "./bash-command.mjs";
 import { emit, isMain, readPayload } from "./hook-io.mjs";
 
+const root = path.resolve(import.meta.dirname, "..", "..");
 const EDIT_TOOLS = new Set(["Write", "Edit", "MultiEdit", "NotebookEdit"]);
-const VERIFY_COMMAND = /\bnpm run verify\b|scripts[\\/]verify\.mjs/;
-const VERIFY_PASSED = /\[verify\] 통과: Node 24 확인/;
+const FULL_PASS = /^\[verify\] 전체 통과 · 작업 트리 ([0-9a-f]{40,64})\s*$/m;
 
 function textOf(content) {
   if (typeof content === "string") return content;
@@ -13,12 +20,17 @@ function textOf(content) {
   return "";
 }
 
-/** 세션 기록 텍스트에서 코드 수정 뒤 verify가 통과했는지 판정한다. */
+function isVerifyRun({ argv }) {
+  const name = commandName(argv[0]);
+  if (name === "npm") return (argv[1] === "run" || argv[1] === "run-script") && argv[2] === "verify";
+  return name === "node" && argv.slice(1).some((word) => /(^|[\\/])scripts[\\/]verify\.mjs$/.test(word));
+}
+
+/** 세션 기록에서 코드를 바꿨는지와, 마지막 전체 verify 통과 때의 작업 트리 id를 읽는다. */
 export function verifyStatus(transcriptText) {
-  let order = 0;
-  let lastCodeEdit = -1;
-  let lastPassedVerify = -1;
-  const verifyCalls = new Map();
+  let touched = false;
+  let passedTree = null;
+  const verifyCalls = new Set();
   for (const line of transcriptText.split("\n")) {
     if (line.trim() === "") continue;
     let entry;
@@ -31,41 +43,57 @@ export function verifyStatus(transcriptText) {
     if (!Array.isArray(content)) continue;
     for (const part of content) {
       if (part?.type === "tool_use") {
-        order += 1;
         const input = part.input ?? {};
         if (EDIT_TOOLS.has(part.name)) {
-          const target = String(input.file_path ?? input.notebook_path ?? "");
-          if (!target.endsWith(".md")) lastCodeEdit = order;
-        } else if (part.name === "Bash" && VERIFY_COMMAND.test(String(input.command ?? ""))) {
-          verifyCalls.set(part.id, order);
+          if (!String(input.file_path ?? input.notebook_path ?? "").endsWith(".md")) touched = true;
+        } else if (part.name === "Bash") {
+          const commands = simpleCommands(String(input.command ?? ""), root);
+          if (commands.some(changesFiles)) touched = true;
+          if (commands.some(isVerifyRun)) verifyCalls.add(part.id);
         }
-      } else if (part?.type === "tool_result" && verifyCalls.has(part.tool_use_id)) {
-        if (part.is_error !== true && VERIFY_PASSED.test(textOf(part.content))) {
-          lastPassedVerify = Math.max(lastPassedVerify, verifyCalls.get(part.tool_use_id));
-        }
+      } else if (part?.type === "tool_result" && verifyCalls.has(part.tool_use_id) && part.is_error !== true) {
+        const match = FULL_PASS.exec(textOf(part.content));
+        if (match !== null) passedTree = match[1];
       }
     }
   }
-  return { edited: lastCodeEdit !== -1, verified: lastPassedVerify > lastCodeEdit };
+  return { touched, passedTree };
 }
 
-const BLOCK_REASON =
-  "코드를 고친 뒤에 통과한 `npm run verify`가 없습니다. 끝내기 전에 `npm run verify`를 실행해 통과를 확인하고, 실패하면 원인을 고친 뒤 다시 실행하세요. 기존 테스트의 기대값을 바꿔서 통과시키지 마세요.";
+const HOW_TO =
+  "끝내기 전에 `npm run verify`를 실행해 다섯 단계 전체 통과를 확인하세요(`--only`로 일부만 돌린 것은 치지 않습니다). 실패하면 원인을 고친 뒤 다시 실행하고, 기존 테스트의 기대값을 바꿔서 통과시키지 마세요.";
 
-export function decide(payload, readTranscript) {
+function stopOrWarn(payload, why) {
+  if (payload.stop_hook_active === true) {
+    return {
+      systemMessage: `${why} verify 확인 없이 끝났습니다. 이미 한 번 막았기 때문에 더 막지 않습니다(계속 막으면 끝내기가 끝없이 반복됩니다).`,
+    };
+  }
+  return { decision: "block", reason: `${why} ${HOW_TO}` };
+}
+
+export function decide(payload, readTranscript, currentTree) {
   let status;
   try {
     status = verifyStatus(readTranscript(payload.transcript_path));
   } catch (error) {
-    status = { edited: true, verified: false, error: error.message };
+    return stopOrWarn(payload, `세션 기록을 읽지 못했습니다(${error.message}).`);
   }
-  if (!status.edited || status.verified) return null;
-  if (payload.stop_hook_active === true) {
-    return { systemMessage: "verify가 통과하지 않은 채로 끝났습니다. 한 번 막은 뒤에도 그대로라서 더 막지 않습니다." };
+  if (!status.touched) return null;
+  let tree;
+  try {
+    tree = currentTree();
+  } catch (error) {
+    return stopOrWarn(payload, `작업 트리 지문을 만들지 못했습니다(${error.message}).`);
   }
-  return { decision: "block", reason: status.error ? `${BLOCK_REASON} (세션 기록을 읽지 못했습니다: ${status.error})` : BLOCK_REASON };
+  if (status.passedTree === tree) return null;
+  const why =
+    status.passedTree === null
+      ? "코드를 바꿨는데 이 세션에서 전체 통과한 `npm run verify`가 없습니다."
+      : "마지막으로 전체 통과한 `npm run verify` 뒤에 코드가 바뀌었습니다.";
+  return stopOrWarn(payload, why);
 }
 
 if (isMain(import.meta.url)) {
-  emit(decide(await readPayload(), (file) => readFileSync(file, "utf8")));
+  emit(decide(await readPayload(), (file) => readFileSync(file, "utf8"), () => worktreeId(root)));
 }
