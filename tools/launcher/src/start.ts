@@ -1,11 +1,12 @@
 // node start.mjs [--check] [claude에 넘길 옵션...]
 // Node 24 확인(start.mjs가 먼저 함) → 실습 설정 폴더 위치 → claude 명령 → 의존성 → DB → 실습 설정 폴더·.env·관찰 Hook → claude 실행.
 // 위치 확인은 부작용이 있는 어떤 단계보다 먼저 한다. --check는 실행 전 단계까지만 한다. 어느 단계도 조용히 건너뛰지 않고, 실패하면 단계 이름·이유·할 일을 보이고 1로 끝난다.
-import { copyFileSync, constants as fsConstants, existsSync, mkdirSync, readFileSync, statSync } from "node:fs";
+import { copyFileSync, constants as fsConstants, existsSync, mkdirSync, readFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { parseEnv } from "node:util";
 import { capture, findHere, runVisible, spawnInteractive } from "./command.ts";
+import { checkInstalledDependencies, LockfileError } from "./dependencies.ts";
 import { claudeEnv, isInsideOrEqual, isSamePath, OBSERVER_SETTINGS_PATH, REPO_ROOT, resolvePracticeConfigDir } from "./paths.ts";
 import { runSteps, StepFailure, type Step } from "./report.ts";
 
@@ -44,23 +45,24 @@ function npmPath(): string {
   return npm;
 }
 
-/** node_modules가 지금 package-lock.json대로 설치돼 있는지. npm ci가 남기는 숨은 lock이 package-lock.json보다 새로우면 그렇다. */
-function dependenciesInstalled(): boolean {
-  const installed = path.join(REPO_ROOT, "node_modules", ".package-lock.json");
-  const lock = path.join(REPO_ROOT, "package-lock.json");
-  return existsSync(installed) && statSync(installed).mtimeMs >= statSync(lock).mtimeMs;
-}
-
 function ensureDependencies(): string {
-  if (dependenciesInstalled()) return "통과 (이미 설치됨)";
-  console.log("  node_modules가 없거나 package-lock.json보다 오래돼 npm ci를 실행합니다.");
+  let state;
+  try {
+    state = checkInstalledDependencies(REPO_ROOT);
+  } catch (error) {
+    if (error instanceof LockfileError) throw new StepFailure(error.message, ["레포 파일이 깨졌습니다. git status로 확인하거나 레포를 다시 받으세요."]);
+    throw error;
+  }
+  if (state.installed) return "통과 (이미 설치됨)";
+  console.log(`  ${state.reason}. npm ci를 실행합니다.`);
   const code = runVisible(npmPath(), ["ci"], { cwd: REPO_ROOT });
   if (code !== 0) {
     throw new StepFailure(`npm ci가 실패했습니다(종료 코드 ${code}). 위 npm 출력을 확인하세요.`, [
       `회사망에서 npm이 막혔다면 OS별 압축 파일(node_modules 포함)을 받아 쓰세요: ${RELEASES_URL}`,
     ]);
   }
-  if (!dependenciesInstalled()) throw new StepFailure("npm ci가 끝났지만 node_modules/.package-lock.json이 없습니다.");
+  const after = checkInstalledDependencies(REPO_ROOT);
+  if (!after.installed) throw new StepFailure(`npm ci가 끝났지만 설치 상태가 package-lock.json과 맞지 않습니다: ${after.reason}.`);
   return "새로 설치함 (npm ci)";
 }
 

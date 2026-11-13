@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { existsSync, mkdirSync, readdirSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, symlinkSync, utimesSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
@@ -69,9 +69,78 @@ describe("node start.mjs", () => {
     expect(result.stdout).not.toContain("[7/7]");
     // claude를 부르는 모든 곳(--version 포함)이 실습 설정 폴더를 쓴다.
     expect(fixture.claudeLog()).toEqual([{ args: ["--version"], configDir: fixture.practiceDir, cwd: fixture.repo }]);
+    expect(fixture.npmLog()).toEqual([]);
     expect(existsSync(fixture.practiceDir)).toBe(true);
     expect(readFileSync(path.join(fixture.repo, ".env"), "utf8")).toBe(readFileSync(path.join(fixture.repo, ".env.example"), "utf8"));
     expect(originalClaudeState(fixture)).toEqual(before);
+  });
+
+  describe("의존성 단계는 파일 시각이 아니라 lock 내용으로 설치 여부를 판정한다", () => {
+    it("내용은 같고 시각만 바뀐 경우(압축 해제·checkout·touch)에는 npm ci를 부르지 않는다", () => {
+      fixture = createFixture();
+      const day = 24 * 3600;
+      const now = Date.now() / 1000;
+      // 압축 해제처럼 package-lock.json이 설치 기록보다 훨씬 새로워진 상태
+      utimesSync(path.join(fixture.repo, "package-lock.json"), now + day, now + day);
+      utimesSync(fixture.hiddenLockFile, now - 30 * day, now - 30 * day);
+      const result = fixture.run("start.mjs", ["--check"]);
+
+      expect(result.status, result.stderr).toBe(0);
+      expect(result.stdout).toContain("[4/7] 의존성: 통과 (이미 설치됨)");
+      expect(fixture.npmLog()).toEqual([]);
+    });
+
+    it("이 컴퓨터에 설치되지 않는 optional 바이너리가 숨은 lock에 없어도 설치된 것으로 본다", () => {
+      fixture = createFixture();
+      const lock = fixture.readLock();
+      const skipped = Object.entries(lock.packages).filter(([, entry]) => entry.optional === true && entry.os !== undefined);
+      expect(skipped.length).toBeGreaterThan(0);
+      const installed = fixture.readHiddenLock().packages;
+      expect(skipped.every(([location]) => !(location in installed))).toBe(true);
+      const result = fixture.run("start.mjs", ["--check"]);
+
+      expect(result.status, result.stderr).toBe(0);
+      expect(result.stdout).toContain("[4/7] 의존성: 통과 (이미 설치됨)");
+      expect(fixture.npmLog()).toEqual([]);
+    });
+
+    it("설치된 패키지 버전이 package-lock.json과 다르면 npm ci를 부르고 이유를 보인다", () => {
+      fixture = createFixture();
+      const [location] = Object.entries(fixture.readLock().packages).find(([name, entry]) => name !== "" && entry.optional !== true && entry.resolved !== undefined) ?? [];
+      if (location === undefined) throw new Error("테스트에 쓸 패키지가 package-lock.json에 없습니다.");
+      fixture.editHiddenLock((packages) => {
+        packages[location] = { ...packages[location], version: "0.0.1" };
+      });
+      const result = fixture.run("start.mjs", ["--check"]);
+
+      expect(result.status, result.stderr).toBe(0);
+      expect(result.stdout).toContain(`${location}의 설치된 버전(0.0.1)`);
+      expect(result.stdout).toContain("[4/7] 의존성: 새로 설치함 (npm ci)");
+      expect(fixture.npmLog()).toEqual([{ args: ["ci"], cwd: fixture.repo }]);
+    });
+
+    it("숨은 lock이 없으면 npm ci를 부른다", () => {
+      fixture = createFixture();
+      rmSync(fixture.hiddenLockFile);
+      const result = fixture.run("start.mjs", ["--check"]);
+
+      expect(result.status, result.stderr).toBe(0);
+      expect(result.stdout).toContain("node_modules/.package-lock.json이 없습니다");
+      expect(result.stdout).toContain("[4/7] 의존성: 새로 설치함 (npm ci)");
+      expect(fixture.npmLog()).toEqual([{ args: ["ci"], cwd: fixture.repo }]);
+    });
+
+    it("npm ci가 실패하면 압축 파일 안내와 함께 그 단계에서 멈춘다", () => {
+      fixture = createFixture();
+      rmSync(fixture.hiddenLockFile);
+      fixture.env.FAKE_NPM_EXIT = "1";
+      const result = fixture.run("start.mjs", ["--check"]);
+
+      expect(result.status).not.toBe(0);
+      expect(result.stderr).toContain("[4/7] 의존성: 실패");
+      expect(result.stderr).toContain("https://github.com/yansfil/shop-harness-workshop/releases");
+      expect(result.stdout + result.stderr).not.toContain("[5/7]");
+    });
   });
 
   it("실습 설정 폴더와 관찰 Hook으로 claude를 띄우고 claude의 종료 코드로 끝나며 원래 ~/.claude는 그대로다", () => {

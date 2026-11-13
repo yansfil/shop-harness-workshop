@@ -2,7 +2,7 @@
 // 바깥 경계(claude 프로그램, HOME)만 가짜로 두고 start.mjs·cleanup.mjs는 실제 프로세스로 돌린다.
 import { spawnSync, type SpawnSyncReturns } from "node:child_process";
 import { createHash } from "node:crypto";
-import { chmodSync, cpSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync, existsSync } from "node:fs";
+import { chmodSync, copyFileSync, cpSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync, existsSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { findHere } from "./command.ts";
@@ -39,6 +39,23 @@ if (process.env.FAKE_CLAUDE_WAIT_FOR_INTERRUPT === "1") {
 }
 `;
 
+// 진짜 npm 대신 PATH에 두는 가짜 npm. 네트워크·설치 없이 부른 인자만 남긴다.
+// ci는 미리 만들어 둔 "정상 설치" 숨은 lock을 node_modules에 복사한다(FAKE_NPM_EXIT가 0이 아니면 아무것도 하지 않고 실패한다).
+const FAKE_NPM = `
+import { appendFileSync, copyFileSync } from "node:fs";
+import path from "node:path";
+const args = process.argv.slice(2);
+appendFileSync(process.env.FAKE_NPM_LOG, JSON.stringify({ args, cwd: process.cwd() }) + "\\n");
+const exit = Number(process.env.FAKE_NPM_EXIT ?? "0");
+if (exit === 0 && args[0] === "ci") copyFileSync(process.env.FAKE_NPM_HIDDEN_LOCK, path.join(process.cwd(), "node_modules", ".package-lock.json"));
+process.exit(exit);
+`;
+
+export interface NpmLogEntry {
+  args: string[];
+  cwd: string;
+}
+
 export interface LogEntry {
   args?: string[];
   configDir?: string | null;
@@ -54,6 +71,16 @@ export interface Fixture {
   originalClaudeDir: string;
   env: NodeJS.ProcessEnv;
   claudeLog: () => LogEntry[];
+  /** 가짜 npm이 받은 호출. 진짜 npm은 한 번도 부르지 않는다. */
+  npmLog: () => NpmLogEntry[];
+  /** 임시 레포의 node_modules/.package-lock.json 위치 */
+  hiddenLockFile: string;
+  /** 임시 레포의 package-lock.json을 읽은 내용 */
+  readLock: () => LockFile;
+  /** 임시 레포의 숨은 lock을 읽은 내용 */
+  readHiddenLock: () => LockFile;
+  /** 숨은 lock의 packages를 고쳐 쓴다. */
+  editHiddenLock: (edit: (packages: Record<string, Record<string, unknown>>) => void) => void;
   run: (script: "start.mjs" | "cleanup.mjs", args?: string[], options?: { input?: string; nodeArgs?: string[] }) => SpawnSyncReturns<string>;
   cleanup: () => void;
 }
@@ -62,6 +89,19 @@ export interface Fixture {
 function setPath(env: NodeJS.ProcessEnv, value: string): void {
   const key = Object.keys(env).find((name) => name.toUpperCase() === "PATH") ?? "PATH";
   env[key] = value;
+}
+
+export interface LockFile {
+  packages: Record<string, Record<string, unknown>>;
+}
+
+/** 모든 optional 패키지를 건너뛴 채 설치했을 때 npm이 남기는 숨은 lock(루트 없음). */
+function hiddenLockFrom(lock: LockFile): LockFile {
+  const packages: LockFile["packages"] = {};
+  for (const [location, entry] of Object.entries(lock.packages)) {
+    if (location !== "" && entry.optional !== true) packages[location] = entry;
+  }
+  return { ...lock, packages };
 }
 
 export function createFixture(options: { claude?: boolean; hook?: boolean; git?: boolean } = {}): Fixture {
@@ -75,7 +115,18 @@ export function createFixture(options: { claude?: boolean; hook?: boolean; git?:
   for (const file of REPO_FILES) {
     cpSync(path.join(REPO_ROOT, file), path.join(repo, file), { recursive: true, preserveTimestamps: true });
   }
-  symlinkSync(path.join(REPO_ROOT, "node_modules"), path.join(repo, "node_modules"), "junction");
+  // node_modules는 항목마다 실제 폴더로 연결하고 숨은 lock만 따로 둔다. 숨은 lock을 고쳐도 실제 node_modules는 그대로다.
+  mkdirSync(path.join(repo, "node_modules"));
+  for (const entry of readdirSync(path.join(REPO_ROOT, "node_modules"))) {
+    if (entry === ".package-lock.json") continue;
+    symlinkSync(path.join(REPO_ROOT, "node_modules", entry), path.join(repo, "node_modules", entry), "junction");
+  }
+  const readLock = (): LockFile => JSON.parse(readFileSync(path.join(repo, "package-lock.json"), "utf8")) as LockFile;
+  const readHiddenLock = (): LockFile => JSON.parse(readFileSync(path.join(repo, "node_modules", ".package-lock.json"), "utf8")) as LockFile;
+  const goodHiddenLock = path.join(root, "hidden-lock.good.json");
+  writeFileSync(goodHiddenLock, JSON.stringify(hiddenLockFrom(readLock())));
+  const hiddenLockFile = path.join(repo, "node_modules", ".package-lock.json");
+  copyFileSync(goodHiddenLock, hiddenLockFile);
   if (options.hook !== false) {
     mkdirSync(path.join(repo, "tools", "observer", "hooks"), { recursive: true });
     writeFileSync(path.join(repo, "tools", "observer", "hooks", "settings.json"), "{}\n");
@@ -99,6 +150,15 @@ export function createFixture(options: { claude?: boolean; hook?: boolean; git?:
     }
   }
 
+  const npmLogFile = path.join(root, "npm-log.jsonl");
+  writeFileSync(path.join(bin, "fake-npm.mjs"), FAKE_NPM);
+  if (process.platform === "win32") {
+    writeFileSync(path.join(bin, "npm.cmd"), `@"${process.execPath}" "%~dp0fake-npm.mjs" %*\r\n`);
+  } else {
+    writeFileSync(path.join(bin, "npm"), `#!/bin/sh\nexec "${process.execPath}" "${path.join(bin, "fake-npm.mjs")}" "$@"\n`);
+    chmodSync(path.join(bin, "npm"), 0o755);
+  }
+
   const databaseFile = path.join(root, "grabmarket.sqlite");
   writeFileSync(databaseFile, "");
 
@@ -112,9 +172,9 @@ export function createFixture(options: { claude?: boolean; hook?: boolean; git?:
     }
   }
 
-  const env: NodeJS.ProcessEnv = { ...process.env, HOME: home, USERPROFILE: home, DATABASE_PATH: databaseFile, FAKE_CLAUDE_LOG: claudeLogFile };
+  const env: NodeJS.ProcessEnv = { ...process.env, HOME: home, USERPROFILE: home, DATABASE_PATH: databaseFile, FAKE_CLAUDE_LOG: claudeLogFile, FAKE_NPM_LOG: npmLogFile, FAKE_NPM_HIDDEN_LOCK: goodHiddenLock };
   delete env.CLAUDE_CONFIG_DIR;
-  // 진짜 claude가 보이지 않도록 PATH에는 가짜 claude 폴더와 git 폴더만 둔다.
+  // 진짜 claude·npm이 보이지 않도록 PATH에는 가짜 claude·npm 폴더와 git 폴더만 둔다.
   setPath(env, [bin, path.dirname(git)].join(path.delimiter));
 
   return {
@@ -131,6 +191,21 @@ export function createFixture(options: { claude?: boolean; hook?: boolean; git?:
             .split("\n")
             .map((line) => JSON.parse(line) as LogEntry)
         : [],
+    npmLog: () =>
+      existsSync(npmLogFile)
+        ? readFileSync(npmLogFile, "utf8")
+            .trim()
+            .split("\n")
+            .map((line) => JSON.parse(line) as NpmLogEntry)
+        : [],
+    hiddenLockFile,
+    readLock,
+    readHiddenLock,
+    editHiddenLock: (edit) => {
+      const hidden = readHiddenLock();
+      edit(hidden.packages);
+      writeFileSync(hiddenLockFile, JSON.stringify(hidden));
+    },
     run: (script, args = [], runOptions = {}) =>
       spawnSync(process.execPath, [...(runOptions.nodeArgs ?? []), path.join(repo, script), ...args], {
         cwd: repo,
