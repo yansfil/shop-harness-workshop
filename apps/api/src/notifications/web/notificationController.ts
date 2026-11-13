@@ -3,7 +3,6 @@ import type { Router } from "express";
 import { mustAdmin, mustCustomer, ok, paramInt, queryStr, wrap } from "../../legacy/legacyUtils.ts";
 import * as queue from "../notificationQueue.ts";
 import { tick } from "../notificationWorker.ts";
-import { countQueue } from "../infra/notificationDao.ts";
 
 export function registerNotificationRoutes(router: Router): void {
   // 내 알림함
@@ -53,7 +52,7 @@ export function registerNotificationRoutes(router: Router): void {
     "/api/admin/notification-queue/counts",
     wrap((_req, res) => {
       mustAdmin(res);
-      ok(res, countQueue());
+      ok(res, queue.queueCounts());
     }),
   );
 

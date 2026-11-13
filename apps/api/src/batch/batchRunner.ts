@@ -13,6 +13,7 @@ import {
   notFoundError,
   now,
   nowIso,
+  nowMs,
   startOfDay,
   ymd,
 } from "../legacy/legacyUtils.ts";
@@ -49,10 +50,10 @@ export function runJob(job: string, trigger: string, runKeyInput?: string): any 
   }
   const id = dao.startRun(job, runKey, trigger, startedIso);
   RUNNING[job] = true;
-  const started = Date.now();
+  const started = nowMs();
   try {
     const result = fn(id, runKey);
-    const duration = Date.now() - started;
+    const duration = nowMs() - started;
     if (result && result.quiet && trigger === "schedule") {
       dao.deleteRun(id);
       return { id: null, job: job, state: "success", quiet: true };
@@ -68,7 +69,7 @@ export function runJob(job: string, trigger: string, runKeyInput?: string): any 
     log("batch_finished", { job: job, runId: id, processed: result.processed, ms: duration });
     return { id: id, job: job, state: "success", processed: result.processed, total: result.total };
   } catch (e: any) {
-    const duration = Date.now() - started;
+    const duration = nowMs() - started;
     dao.finishRun(id, "failed", 0, null, errorText(e), nowIso(), duration);
     dao.addLogs(id, "error", [errorText(e)], nowIso());
     logError("batch_failed", e, { job: job, runId: id });

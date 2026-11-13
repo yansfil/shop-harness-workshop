@@ -44,11 +44,12 @@ describe("포인트 결제 주문 취소", () => {
     giveBalance(db, 2, 5000);
     const customer = await loginAs(app, ACCOUNT.customerA);
     const placed = await customer.post("/api/checkout").send({ ...orderBody([{ productId: PRODUCT.tangerine, quantity: 1 }]), usePoints: 3000 }).expect(201);
-    expect(balanceOf(db, 2)).toBe(2000);
+    // 5,000P - 사용 3,000P + 적립(결제 17,900원의 1%) 179P
+    expect(balanceOf(db, 2)).toBe(2179);
 
     await customer.post(buildPath(ROUTES.orderCancel, { orderId: (placed.body as { order: { id: number } }).order.id })).send({}).expect(200);
 
-    expect(balanceOf(db, 2)).toBe(5000);
+    expect(balanceOf(db, 2)).toBe(2179 + 3000);
   });
 });
 
@@ -128,6 +129,33 @@ describe("쿠폰·포인트 결제", () => {
     const response = await customer.post("/api/checkout").send({ ...orderBody([{ productId: PRODUCT.tangerine, quantity: 1 }]), usePoints: 100 }).expect(201);
 
     expect((response.body as { order: { orderNumber: string } }).order.orderNumber).toBe("GM-20261114-0001");
+  });
+});
+
+describe("쿠폰 할인 금액", () => {
+  const COUPON = { name: "테스트 쿠폰", code: "TEST5000", minOrderAmount: 0, endsAt: "2026-12-31", issueLimit: 10 };
+
+  it("관리자가 0원 이하 할인 쿠폰을 발급하려 하면 거절한다", async () => {
+    const { app } = createTestApp();
+    const admin = await loginAs(app, ACCOUNT.admin);
+
+    const response = await admin.post("/api/admin/coupons").send({ ...COUPON, discountAmount: -5000 }).expect(400);
+
+    expect((response.body as { error: { fieldErrors: Record<string, string[]> } }).error.fieldErrors).toHaveProperty("discountAmount");
+    await admin.post("/api/admin/coupons").send({ ...COUPON, discountAmount: 0 }).expect(400);
+  });
+
+  it("주문 금액보다 큰 할인 쿠폰을 써도 결제 금액이 배송비 아래로 내려가지 않는다", async () => {
+    const { app } = createTestApp();
+    const admin = await loginAs(app, ACCOUNT.admin);
+    const customer = await loginAs(app, ACCOUNT.customerA);
+    await admin.post("/api/admin/coupons").send({ ...COUPON, discountAmount: 50_000 }).expect(201);
+
+    const response = await customer.post("/api/checkout").send({ ...orderBody([{ productId: PRODUCT.socks, quantity: 1 }]), couponCode: COUPON.code }).expect(201);
+
+    const payment = (response.body as { payment: { couponDiscount: number; paidAmount: number } }).payment;
+    expect(payment.couponDiscount).toBe(5_000);
+    expect(payment.paidAmount).toBe(3_000);
   });
 });
 

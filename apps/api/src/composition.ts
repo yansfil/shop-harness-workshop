@@ -48,7 +48,7 @@ export function composeServices({ db, clock }: AppDependencies) {
   const orderRepository = new SqliteOrderRepository(db);
   const orders = new OrderService(orderRepository, catalog, inventory, uow, clock, [legacyCancelListener]);
   const adminOrders = new AdminOrderService(orderRepository, uow, clock);
-  return { uow, auth, catalog, inventory, orders, adminOrders, orderRepository };
+  return { uow, auth, catalog, inventory, orders, adminOrders, orderRepository, clock };
 }
 
 export function composeApp(dependencies: AppDependencies): Express {

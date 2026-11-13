@@ -218,3 +218,8 @@ export function recent(sinceIso: string): any[] {
     registeredAt: r.registered_at,
   }));
 }
+
+/** 송장 등록 화면의 택배사 목록 */
+export function courierList(): any[] {
+  return couriers();
+}

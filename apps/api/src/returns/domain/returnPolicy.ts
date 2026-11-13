@@ -1,6 +1,5 @@
 // 반품·교환 규칙: 배송완료 7일 안에 신청하고, 관리자가 승인·거절한다.
 import { CONFIG, DAY, RETURN_REASONS, fmtMd, toDate, toInt } from "../../legacy/legacyUtils.ts";
-import { deliveredAtOf, requestedQuantities } from "../infra/returnDao.ts";
 
 export const RETURN_KINDS = ["return", "exchange"];
 
@@ -14,14 +13,13 @@ export function deadlineOf(deliveredAt: any): Date {
 }
 
 /**
- * 이 주문을 지금 반품·교환할 수 있는지.
+ * 이 주문을 지금 반품·교환할 수 있는지. deliveredAt은 배송완료 시각(없으면 null).
  * { ok: true, deadline } 또는 { ok: false, reason }
  */
-export function eligibility(order: any, atValue: any): any {
+export function eligibility(order: any, atValue: any, deliveredAt: string | null): any {
   if (!order) return { ok: false, reason: "주문을 찾을 수 없어요." };
   if (order.status === "cancelled") return { ok: false, reason: "취소된 주문이에요." };
   if (order.status !== "delivered") return { ok: false, reason: "배송이 끝난 뒤에 신청할 수 있어요." };
-  const deliveredAt = deliveredAtOf(order.id);
   if (!deliveredAt) return { ok: false, reason: "배송이 끝난 뒤에 신청할 수 있어요." };
   const deadline = deadlineOf(deliveredAt);
   if (toDate(atValue).getTime() > deadline.getTime()) {
@@ -30,9 +28,8 @@ export function eligibility(order: any, atValue: any): any {
   return { ok: true, deadline: deadline.toISOString(), deliveredAt: deliveredAt };
 }
 
-/** 품목마다 더 신청할 수 있는 수량 */
-export function remainingQuantities(orderId: any, items: any[]): any {
-  const taken = requestedQuantities(orderId);
+/** 품목마다 더 신청할 수 있는 수량. taken은 품목별로 이미 신청한 수량 */
+export function remainingQuantities(items: any[], taken: any): any {
   const out: any = {};
   for (const item of items) out[item.id] = toInt(item.quantity) - toInt(taken[item.id] || 0);
   return out;

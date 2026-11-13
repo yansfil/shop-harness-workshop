@@ -205,3 +205,8 @@ export function listen(): void {
   on("points.granted", (e: any) => enqueue(e.userId, "points_granted", { points: e.points, title: e.title }, e.at));
   on("exchange.shipped", (e: any) => enqueueForOrder("exchange_shipped", e.orderId, { itemText: e.itemText, requestNo: e.requestNo, trackingNo: e.trackingNo }, e.at));
 }
+
+/** 관리자 화면 상단 숫자 */
+export function queueCounts(): any {
+  return dao.countQueue();
+}

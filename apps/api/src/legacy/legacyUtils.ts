@@ -24,7 +24,6 @@ export const STATE: any = {
 };
 
 export const CONFIG: any = {
-  POINT_RATE: 0.01,
   POINT_EXPIRE_DAYS: 365,
   POINT_MIN_USE: 0,
   POINT_UNIT: 1,
@@ -100,16 +99,17 @@ export const MINUTE = 60 * 1000;
 export const HOUR = 60 * MINUTE;
 export const DAY = 24 * HOUR;
 
+/** 지금 시각. 조립 때 넣어 준 Clock에서만 읽는다(테스트는 고정 시계) */
 export function now(): Date {
-  return new Date();
+  return getServices().clock.now();
 }
 
 export function nowIso(): string {
-  return new Date().toISOString();
+  return now().toISOString();
 }
 
 export function nowMs(): number {
-  return Date.now();
+  return now().getTime();
 }
 
 export function toDate(value: any): Date {
@@ -211,7 +211,7 @@ export function diffDaysFloor(a: any, b: any): number {
 }
 
 export function isPast(value: any): boolean {
-  return toDate(value).getTime() < Date.now();
+  return toDate(value).getTime() < nowMs();
 }
 
 export function isFuture(value: any): boolean {

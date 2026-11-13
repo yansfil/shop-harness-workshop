@@ -88,8 +88,8 @@ export function eligibleOrders(user: any): any {
     returnDays: CONFIG.RETURN_DAYS,
     orders: orders.map((o: any) => {
       const items = loadOrderItems(o.id);
-      const remaining = remainingQuantities(o.id, items);
-      const check = eligibility(o, at);
+      const remaining = remainingQuantities(items, dao.requestedQuantities(o.id));
+      const check = eligibility(o, at, dao.deliveredAtOf(o.id));
       return {
         id: o.id,
         orderNumber: o.order_number,
@@ -118,7 +118,7 @@ export function eligibleOrders(user: any): any {
 
 /** 주문 한 건의 반품 가능 여부 (주문 상세 버튼용) */
 export function eligibilityFor(order: any): any {
-  const check = eligibility(order, nowIso());
+  const check = eligibility(order, nowIso(), dao.deliveredAtOf(order.id));
   return { returnable: check.ok, returnBlockedReason: check.ok ? null : check.reason, returnDeadline: check.ok ? check.deadline : null };
 }
 
@@ -131,11 +131,11 @@ export function request(user: any, body: any): any {
   const reasonCode = mustOneOf(body.reasonCode, reasonCodes(), "reasonCode");
   const detail = isBlank(body.detail) ? null : truncate(trim(body.detail), 500);
   const at = nowIso();
-  const check = eligibility(order, at);
+  const check = eligibility(order, at, dao.deliveredAtOf(order.id));
   if (!check.ok) throw conflict("RETURN_NOT_ALLOWED", check.reason);
   const items = loadOrderItems(orderId);
   const lines = Array.isArray(body.items) ? body.items : [];
-  const problem = checkRequestItems(lines, items, remainingQuantities(orderId, items));
+  const problem = checkRequestItems(lines, items, remainingQuantities(items, dao.requestedQuantities(orderId)));
   if (problem) throw badRequest(problem, { fieldErrors: { items: [problem] } });
   const refundAmount = refundAmountFor(kind, lines, items);
   const byId: any = {};
@@ -248,4 +248,9 @@ export function forOrder(orderId: any): any[] {
     .listByUser(loadOrderRow(orderId) ? loadOrderRow(orderId).customer_id : 0)
     .filter((r: any) => Number(r.order_id) === Number(orderId))
     .map((r: any) => ({ id: r.id, requestNo: r.request_no, kind: r.kind, kindText: RETURN_KIND_TEXT[r.kind], state: r.state, stateText: RETURN_STATE_TEXT[r.state], refundAmount: r.refund_amount }));
+}
+
+/** 관리자 화면 상단 숫자: 상태별 신청 수 */
+export function countByState(): any {
+  return dao.countByState();
 }

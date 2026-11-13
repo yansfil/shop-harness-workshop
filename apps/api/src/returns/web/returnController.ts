@@ -2,7 +2,6 @@
 import type { Router } from "express";
 import { bodyOf, created, mustAdmin, mustCustomer, ok, paramInt, queryStr, wrap } from "../../legacy/legacyUtils.ts";
 import * as returnManager from "../returnManager.ts";
-import { countByState } from "../infra/returnDao.ts";
 
 export function registerReturnRoutes(router: Router): void {
   router.get(
@@ -41,7 +40,7 @@ export function registerReturnRoutes(router: Router): void {
     "/api/admin/returns/counts",
     wrap((_req, res) => {
       mustAdmin(res);
-      ok(res, countByState());
+      ok(res, returnManager.countByState());
     }),
   );
 

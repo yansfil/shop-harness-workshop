@@ -2,7 +2,6 @@
 import type { Router } from "express";
 import { bodyOf, created, mustAdmin, mustCustomer, ok, paramInt, queryStr, wrap } from "../../legacy/legacyUtils.ts";
 import * as deliveryManager from "../deliveryManager.ts";
-import { couriers } from "../infra/fakeCourierApi.ts";
 
 export function registerDeliveryRoutes(router: Router): void {
   // 고객: 배송 추적
@@ -28,7 +27,7 @@ export function registerDeliveryRoutes(router: Router): void {
     wrap((req, res) => {
       mustAdmin(res);
       const code = queryStr(req, "courier", "SB");
-      ok(res, { couriers: couriers(), suggestedTrackingNo: deliveryManager.suggestTrackingNo(code) });
+      ok(res, { couriers: deliveryManager.courierList(), suggestedTrackingNo: deliveryManager.suggestTrackingNo(code) });
     }),
   );
 
