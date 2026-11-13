@@ -44,12 +44,12 @@ describe("포인트 결제 주문 취소", () => {
     giveBalance(db, 2, 5000);
     const customer = await loginAs(app, ACCOUNT.customerA);
     const placed = await customer.post("/api/checkout").send({ ...orderBody([{ productId: PRODUCT.tangerine, quantity: 1 }]), usePoints: 3000 }).expect(201);
-    // 5,000P - 사용 3,000P + 적립(결제 17,900원의 1%) 179P
-    expect(balanceOf(db, 2)).toBe(2179);
+    // 적립 규칙(S4)과 무관하게 판정하려고 취소 전후 잔액의 차이만 본다.
+    const beforeCancel = balanceOf(db, 2);
 
     await customer.post(buildPath(ROUTES.orderCancel, { orderId: (placed.body as { order: { id: number } }).order.id })).send({}).expect(200);
 
-    expect(balanceOf(db, 2)).toBe(2179 + 3000);
+    expect(balanceOf(db, 2) - beforeCancel).toBe(3000);
   });
 });
 
@@ -122,13 +122,15 @@ describe("쿠폰·포인트 결제", () => {
   });
 
   it("주문 번호의 날짜는 주입한 시계를 따른다", async () => {
-    const { app, db } = createTestApp();
+    const { app, db, clock } = createTestApp();
     giveBalance(db, 2, 5000);
     const customer = await loginAs(app, ACCOUNT.customerA);
+    // 로그인 뒤에 시계를 테스트를 돌리는 실제 날짜와 겹칠 수 없는 과거로 되돌린다(2026-11-14 03:00 UTC의 100일 전, 2026-08-06).
+    clock.advance(-100 * 24 * 60 * 60 * 1000);
 
     const response = await customer.post("/api/checkout").send({ ...orderBody([{ productId: PRODUCT.tangerine, quantity: 1 }]), usePoints: 100 }).expect(201);
 
-    expect((response.body as { order: { orderNumber: string } }).order.orderNumber).toBe("GM-20261114-0001");
+    expect((response.body as { order: { orderNumber: string } }).order.orderNumber).toBe("GM-20260806-0001");
   });
 });
 
@@ -156,6 +158,41 @@ describe("쿠폰 할인 금액", () => {
     const payment = (response.body as { payment: { couponDiscount: number; paidAmount: number } }).payment;
     expect(payment.couponDiscount).toBe(5_000);
     expect(payment.paidAmount).toBe(3_000);
+  });
+});
+
+describe("이미 발급된 불량 쿠폰", () => {
+  // 신규 발급 검사가 생기기 전에 발급된 쿠폰을 흉내 낸다: 같은 DB에 -5,000원 쿠폰이 이미 있다.
+  function issueBadCoupon(db: ReturnType<typeof createTestApp>["db"], code: string, discountAmount: number): void {
+    db.prepare(
+      "INSERT INTO coupons (code, name, discount_amount, min_order_amount, starts_at, ends_at, issue_limit, issued_count, used_count, created_by, created_at) VALUES (?, ?, ?, 0, ?, ?, 10, 0, 0, 1, ?)",
+    ).run(code, "불량 쿠폰", discountAmount, "2026-11-01T00:00:00.000Z", "2026-12-31T00:00:00.000Z", "2026-11-01T00:00:00.000Z");
+  }
+
+  it.each([-5000, 0])("할인 금액이 %i원인 쿠폰은 주문서 계산에서 이유와 함께 거절하고 결제 금액을 늘리지 않는다", async (discountAmount) => {
+    const { app, db } = createTestApp();
+    issueBadCoupon(db, "BADCOUPON", discountAmount);
+    const customer = await loginAs(app, ACCOUNT.customerA);
+
+    const response = await customer.post("/api/checkout/quote").send({ items: [{ productId: PRODUCT.socks, quantity: 1 }], couponCode: "BADCOUPON" }).expect(200);
+
+    const quote = response.body as { couponProblem: { code: string } | null; coupon: unknown; couponDiscount: number; paidAmount: number };
+    expect(quote.couponProblem?.code).toBe("COUPON_INVALID_AMOUNT");
+    expect(quote.coupon).toBeNull();
+    expect(quote.couponDiscount).toBe(0);
+    expect(quote.paidAmount).toBe(8_000);
+  });
+
+  it.each([-5000, 0])("할인 금액이 %i원인 쿠폰으로는 결제할 수 없고 쿠폰 사용 기록도 남지 않는다", async (discountAmount) => {
+    const { app, db } = createTestApp();
+    issueBadCoupon(db, "BADCOUPON", discountAmount);
+    const customer = await loginAs(app, ACCOUNT.customerA);
+
+    const response = await customer.post("/api/checkout").send({ ...orderBody([{ productId: PRODUCT.socks, quantity: 1 }]), couponCode: "BADCOUPON" }).expect(409);
+
+    expect((response.body as { error: { code: string } }).error.code).toBe("COUPON_INVALID_AMOUNT");
+    expect((db.prepare("SELECT COUNT(*) AS n FROM orders").get() as { n: number }).n).toBe(0);
+    expect((db.prepare("SELECT COUNT(*) AS n FROM coupon_redemptions").get() as { n: number }).n).toBe(0);
   });
 });
 

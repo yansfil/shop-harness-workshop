@@ -26,6 +26,10 @@ export function checkApplicable(coupon: any, subtotal: any, alreadyUsed: boolean
   if (state === "expired") return { ok: false, code: "COUPON_EXPIRED", message: expiredMessage(coupon.ends_at) };
   if (state === "exhausted") return { ok: false, code: "COUPON_EXHAUSTED", message: COUPON_MESSAGES.EXHAUSTED };
   if (state === "paused") return { ok: false, code: "COUPON_PAUSED", message: COUPON_MESSAGES.PAUSED };
+  // 이미 발급된 불량 쿠폰(0원 이하·소수)도 적용 단계에서 막는다. 조회·적용·결제가 모두 이 검사를 지난다.
+  if (!Number.isInteger(Number(coupon.discount_amount)) || Number(coupon.discount_amount) < 1) {
+    return { ok: false, code: "COUPON_INVALID_AMOUNT", message: COUPON_MESSAGES.INVALID_AMOUNT };
+  }
   if (alreadyUsed) return { ok: false, code: "COUPON_ALREADY_USED", message: COUPON_MESSAGES.ALREADY_USED };
   if (toNumber(subtotal) < toNumber(coupon.min_order_amount)) {
     return { ok: false, code: "COUPON_MIN_ORDER", message: minOrderMessage(coupon.min_order_amount, subtotal) };

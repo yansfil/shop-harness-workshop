@@ -11,6 +11,7 @@ export const COUPON_MESSAGES: any = {
   ONE_PER_ORDER: "쿠폰은 주문당 한 장만 쓸 수 있어요.",
   ADMIN: "관리자 계정은 쿠폰을 쓸 수 없어요.",
   PAUSED: "지금은 잠시 쓸 수 없는 쿠폰이에요.",
+  INVALID_AMOUNT: "할인 금액이 올바르지 않은 쿠폰이라 쓸 수 없어요.",
 };
 
 export function minOrderMessage(minOrder: any, subtotal: any): string {
