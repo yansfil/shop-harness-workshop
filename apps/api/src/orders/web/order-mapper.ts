@@ -1,4 +1,4 @@
-import type { AdminOrderListResponse, AdminOrderResponse, OrderDetail, OrderQuoteResponse, OrderResponse, OrderSummary } from "@grabmarket/contracts";
+import type { AdminOrderListResponse, AdminOrderResponse, MyOrderResponse, OrderDetail, OrderQuoteResponse, OrderResponse, OrderSummary } from "@grabmarket/contracts";
 import type { AdminOrderView } from "../application/admin-order-service.ts";
 import type { Quote } from "../application/order-service.ts";
 import type { AdminOrderRow, Order } from "../domain/order.ts";
@@ -28,6 +28,11 @@ export function toOrderDetailDto(order: Order): OrderDetail {
 
 export function toOrderResponse(order: Order): OrderResponse {
   return { order: toOrderDetailDto(order) };
+}
+
+/** 내 주문 상세. 경과 일수는 서비스가 계산한 값을 받는다. */
+export function toMyOrderResponse(order: Order, elapsedDays: number): MyOrderResponse {
+  return { order: { ...toOrderDetailDto(order), elapsedDays } };
 }
 
 /** 내 주문 목록의 한 줄 */

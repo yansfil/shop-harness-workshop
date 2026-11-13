@@ -3,7 +3,7 @@ import type { Router } from "express";
 import type { Controller } from "../../shared/web/controller.ts";
 import { requireCustomer } from "../../shared/web/session.ts";
 import type { OrderService } from "../application/order-service.ts";
-import { toOrderResponse, toOrderSummaryDto } from "./order-mapper.ts";
+import { toMyOrderResponse, toOrderSummaryDto } from "./order-mapper.ts";
 
 /** 내 주문 목록과 상세. 고객은 세션에서만 정하고, 남의 주문 번호는 NotFound다. */
 export class MyOrderController implements Controller {
@@ -23,7 +23,8 @@ export class MyOrderController implements Controller {
     router.get(ROUTES.order, (req, res) => {
       const user = requireCustomer(res);
       const { orderId } = OrderParamsSchema.parse(req.params);
-      res.json(toOrderResponse(this.#orders.getForCustomer(user.id, orderId)));
+      const order = this.#orders.getForCustomer(user.id, orderId);
+      res.json(toMyOrderResponse(order, this.#orders.elapsedDays(order)));
     });
   }
 }

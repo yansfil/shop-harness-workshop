@@ -30,7 +30,6 @@
 | `packages/shared` | 여러 곳에서 쓰는 작은 모듈 |
 | `tools` | 관찰 도구 |
 | `tests` | API 통합 테스트 |
-| `docs` | 문서 |
 | `data` | 로컬 SQLite 파일(git 제외) |
 
 ## 지킬 것

@@ -11,7 +11,7 @@ import { Page } from "../components/page.tsx";
 import { Bone, EmptyState } from "../components/states.tsx";
 import { StatusBadge } from "../components/status-badge.tsx";
 import { krw } from "../lib/format.ts";
-import { formatShortTime } from "../lib/format.ts";
+import { elapsedOrderLabel, formatShortTime } from "../lib/format.ts";
 import { NotFoundError } from "../lib/not-found.ts";
 
 export function summarize(order: Pick<OrderSummary, "firstItemName" | "itemCount">): string {
@@ -157,7 +157,7 @@ export function MyOrderPage() {
             <h1 className="mt-3 flex flex-wrap items-center gap-3 text-xl leading-8 font-extrabold text-ink md:text-2xl">
               주문 {order.orderNumber}
               <StatusBadge status={order.status} />
-              <span className="text-sm leading-5 font-medium text-ink-3">{formatShortTime(order.createdAt)} 주문</span>
+              <span className="text-sm leading-5 font-medium text-ink-3">{formatShortTime(order.createdAt)} · {elapsedOrderLabel(order.elapsedDays)}</span>
             </h1>
             <div className="mt-4 rounded-md border border-line bg-ground px-4 py-5 md:px-6 md:py-6">
               <div className="mx-auto max-w-190">
