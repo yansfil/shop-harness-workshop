@@ -82,7 +82,7 @@ export function log(event: string, data?: any): void {
   if (CONFIG.QUIET) return;
   try {
     console.log(JSON.stringify({ at: nowIso(), event: event, ...(data || {}) }));
-  } catch (e) {
+  } catch {
     console.log(event);
   }
 }
@@ -921,7 +921,7 @@ export function clone(obj: any): any {
 export function safeJson(text: any, fallback?: any): any {
   try {
     return JSON.parse(String(text));
-  } catch (e) {
+  } catch {
     return fallback == null ? {} : fallback;
   }
 }

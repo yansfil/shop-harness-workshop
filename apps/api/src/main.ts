@@ -3,6 +3,7 @@ import { migrate, openDatabase } from "@grabmarket/db";
 import { systemClock } from "@grabmarket/shared";
 import { composeApp } from "./composition.ts";
 import { loadConfig } from "./config.ts";
+import { startLegacyWorkers, stopLegacyWorkers } from "./legacy/legacyBootstrap.ts";
 
 const HOST = "127.0.0.1";
 
@@ -18,9 +19,11 @@ const server = app.listen(config.apiPort, HOST, (error?: Error) => {
     process.exit(1);
   }
   console.log(`그랩마켓 API: http://${HOST}:${config.apiPort}`);
+  startLegacyWorkers();
 });
 
 function shutdown(): void {
+  stopLegacyWorkers();
   server.close(() => {
     db.close();
     process.exit(0);
