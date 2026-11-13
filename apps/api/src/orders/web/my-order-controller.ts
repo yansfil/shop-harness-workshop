@@ -1,51 +1,30 @@
-import {
-  type MyOrderListResponse,
-  OrderParamsSchema,
-  ROUTES,
-} from "@grabmarket/contracts";
+import { type MyOrderListResponse, OrderParamsSchema, ROUTES } from "@grabmarket/contracts";
 import type { Router } from "express";
-import { notFound } from "../../shared/domain/domain-error.ts";
 import type { Controller } from "../../shared/web/controller.ts";
 import { requireCustomer } from "../../shared/web/session.ts";
-import type { OrderRepository } from "../domain/order.ts";
-import { toOrderResponse } from "./order-mapper.ts";
+import type { OrderService } from "../application/order-service.ts";
+import { toMyOrderResponse, toOrderSummaryDto } from "./order-mapper.ts";
 
+/** 내 주문 목록과 상세. 고객은 세션에서만 정하고, 남의 주문 번호는 NotFound다. */
 export class MyOrderController implements Controller {
-  readonly #orders: OrderRepository;
+  readonly #orders: OrderService;
 
-  constructor(orders: OrderRepository) {
+  constructor(orders: OrderService) {
     this.#orders = orders;
   }
 
   register(router: Router): void {
     router.get(ROUTES.orders, (_req, res) => {
       const user = requireCustomer(res);
-      const orders = this.#orders.listByCustomer(user.id);
-      const body: MyOrderListResponse = {
-        orders: orders.map((order) => {
-          const [first] = order.items;
-          if (first === undefined) throw new Error(`주문 ${order.number}에 품목이 없습니다`);
-          return {
-            id: order.id,
-            orderNumber: order.number,
-            status: order.status,
-            total: order.total,
-            itemCount: order.items.length,
-            firstItemName: first.productName,
-            firstItemImageUrl: first.imagePath,
-            createdAt: order.createdAt.toISOString(),
-          };
-        }),
-      };
-      res.json(body);
+      const orders = this.#orders.listForCustomer(user.id);
+      res.json({ orders: orders.map(toOrderSummaryDto) } satisfies MyOrderListResponse);
     });
 
     router.get(ROUTES.order, (req, res) => {
       const user = requireCustomer(res);
       const { orderId } = OrderParamsSchema.parse(req.params);
-      const order = this.#orders.findForCustomer(user.id, orderId);
-      if (order === undefined) throw notFound("주문");
-      res.json(toOrderResponse(order));
+      const order = this.#orders.getForCustomer(user.id, orderId);
+      res.json(toMyOrderResponse(order, this.#orders.elapsedDays(order)));
     });
   }
 }

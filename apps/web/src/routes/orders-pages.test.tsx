@@ -26,7 +26,7 @@ function order(status: OrderDetail["status"], cancellable: boolean): OrderDetail
 
 function openOrder(initial: OrderDetail) {
   api.on("GET /api/auth/me", () => ({ json: { user: { id: 2, email: "customer1@grabmarket.test", name: "김하늘", role: "customer", phone: "010-1234-5678", address: "서울특별시 한울구 새벽로 12, 302호" } } }));
-  api.on("GET /api/orders/7", () => ({ json: { order: initial } }));
+  api.on("GET /api/orders/7", () => ({ json: { order: { ...initial, elapsedDays: 0 } } }));
   renderApp("/orders/7");
 }
 
@@ -82,7 +82,7 @@ describe("내 주문 상세의 주문 취소", () => {
   it("그 사이 배송이 시작돼 거절되면 이유를 보이고 최신 상태로 바뀐다", async () => {
     let current = order("paid", true);
     api.on("GET /api/auth/me", () => ({ json: { user: { id: 2, email: "customer1@grabmarket.test", name: "김하늘", role: "customer", phone: null, address: null } } }));
-    api.on("GET /api/orders/7", () => ({ json: { order: current } }));
+    api.on("GET /api/orders/7", () => ({ json: { order: { ...current, elapsedDays: 0 } } }));
     api.on("POST /api/orders/7/cancel", () => {
       current = order("shipping", false);
       return { status: 409, json: { error: { code: "ORDER_NOT_CANCELLABLE", message: "배송이 시작된 주문은 취소할 수 없습니다." } } };

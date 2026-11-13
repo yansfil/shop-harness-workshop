@@ -36,3 +36,8 @@ export function formatFullTime(iso: string): string {
   const p = seoulParts(iso);
   return `${p.year}-${p.month}-${p.day} ${p.hour}:${p.minute}`;
 }
+
+/** 0 → "오늘 주문", 3 → "3일 전 주문" */
+export function elapsedOrderLabel(days: number): string {
+  return days === 0 ? "오늘 주문" : `${days}일 전 주문`;
+}
