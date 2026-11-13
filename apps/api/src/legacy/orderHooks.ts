@@ -12,7 +12,7 @@ export const legacyCancelListener = {
       refundAmount = pay.paid_amount - pay.refunded_amount;
       run("UPDATE order_payments SET refunded_amount = paid_amount, refund_status = 'full', updated_at = ? WHERE order_id = ?", when, order.id);
       if (pay.coupon_id) couponManager.restoreForOrder(order.id, when);
-      if (pay.used_point > 0) pointManager.refund(order.customer.id, pay.used_point, order.id, "주문 취소 환불", when);
+      if (pay.point_used > 0) pointManager.refund(order.customer.id, pay.point_used, order.id, "주문 취소 환불", when);
     } else {
       insert("order_payments", {
         order_id: order.id,
