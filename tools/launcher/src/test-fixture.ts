@@ -2,11 +2,23 @@
 // 바깥 경계(claude 프로그램, HOME)만 가짜로 두고 start.mjs·cleanup.mjs는 실제 프로세스로 돌린다.
 import { spawnSync, type SpawnSyncReturns } from "node:child_process";
 import { createHash } from "node:crypto";
-import { chmodSync, cpSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync, existsSync } from "node:fs";
+import { chmodSync, copyFileSync, cpSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync, existsSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { findHere } from "./command.ts";
+import { pathToFileURL } from "node:url";
+import { findCommand, findHere } from "./command.ts";
 import { REPO_ROOT } from "./paths.ts";
+import type { Platform } from "./dependencies.ts";
+
+/**
+ * 테스트가 "이 컴퓨터"로 치는 OS·CPU. LAUNCHER_SIMULATE_PLATFORM=<os>-<cpu>이면 그 값(start.mjs 자식의 의존성 판정도 같은 값을 본다).
+ * 예: LAUNCHER_SIMULATE_PLATFORM=linux-x64 npx vitest run tools/launcher
+ */
+export const TEST_PLATFORM: Platform = (() => {
+  const [os, cpu] = (process.env.LAUNCHER_SIMULATE_PLATFORM ?? "").split("-");
+  return os !== undefined && cpu !== undefined ? { os, cpu } : { os: process.platform, cpu: process.arch };
+})();
+const SIMULATE_PLATFORM_FILE = path.join(import.meta.dirname, "simulate-platform.ts");
 
 const REPO_FILES = [
   "start.mjs",
@@ -39,6 +51,31 @@ if (process.env.FAKE_CLAUDE_WAIT_FOR_INTERRUPT === "1") {
 }
 `;
 
+// 진짜 npm 대신 PATH에 두는 가짜 npm. 네트워크·설치 없이 부른 인자만 남긴다.
+// ci는 미리 만들어 둔 "정상 설치" 숨은 lock을 node_modules에 복사한다(FAKE_NPM_EXIT가 0이 아니면 아무것도 하지 않고 실패한다).
+const FAKE_NPM = `
+import { appendFileSync, copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import path from "node:path";
+const args = process.argv.slice(2);
+appendFileSync(process.env.FAKE_NPM_LOG, JSON.stringify({ args, cwd: process.cwd() }) + "\\n");
+const exit = Number(process.env.FAKE_NPM_EXIT ?? "0");
+if (exit === 0 && args[0] === "ci") {
+  copyFileSync(process.env.FAKE_NPM_HIDDEN_LOCK, path.join(process.cwd(), "node_modules", ".package-lock.json"));
+  for (const location of Object.keys(JSON.parse(readFileSync(process.env.FAKE_NPM_HIDDEN_LOCK, "utf8")).packages)) {
+    const file = path.join(process.cwd(), location, "package.json");
+    if (existsSync(file)) continue;
+    mkdirSync(path.dirname(file), { recursive: true });
+    writeFileSync(file, "{}");
+  }
+}
+process.exit(exit);
+`;
+
+export interface NpmLogEntry {
+  args: string[];
+  cwd: string;
+}
+
 export interface LogEntry {
   args?: string[];
   configDir?: string | null;
@@ -54,6 +91,18 @@ export interface Fixture {
   originalClaudeDir: string;
   env: NodeJS.ProcessEnv;
   claudeLog: () => LogEntry[];
+  /** 가짜 npm이 받은 호출. 진짜 npm은 한 번도 부르지 않는다. */
+  npmLog: () => NpmLogEntry[];
+  /** 임시 레포의 node_modules/.package-lock.json 위치 */
+  hiddenLockFile: string;
+  /** 임시 레포의 package-lock.json을 읽은 내용 */
+  readLock: () => LockFile;
+  /** 임시 레포의 숨은 lock을 읽은 내용 */
+  readHiddenLock: () => LockFile;
+  /** 숨은 lock의 packages를 통째로 바꿔 쓴다. */
+  replaceHiddenLockPackages: (replace: (packages: LockFile["packages"]) => LockFile["packages"]) => void;
+  /** 숨은 lock의 packages를 고쳐 쓴다. */
+  editHiddenLock: (edit: (packages: Record<string, Record<string, unknown>>) => void) => void;
   run: (script: "start.mjs" | "cleanup.mjs", args?: string[], options?: { input?: string; nodeArgs?: string[] }) => SpawnSyncReturns<string>;
   cleanup: () => void;
 }
@@ -62,6 +111,21 @@ export interface Fixture {
 function setPath(env: NodeJS.ProcessEnv, value: string): void {
   const key = Object.keys(env).find((name) => name.toUpperCase() === "PATH") ?? "PATH";
   env[key] = value;
+}
+
+export interface LockFile {
+  packages: Record<string, Record<string, unknown>>;
+}
+
+/** 이 컴퓨터에서 설치했을 때 npm이 남기는 숨은 lock(루트 없음): optional은 이 OS·CPU용 바이너리만 든다. */
+function hiddenLockFrom(lock: LockFile): LockFile {
+  const packages: LockFile["packages"] = {};
+  for (const [location, entry] of Object.entries(lock.packages)) {
+    if (location === "") continue;
+    if (entry.optional !== true) packages[location] = entry;
+    else if (Array.isArray(entry.os) && entry.os.includes(TEST_PLATFORM.os) && (entry.cpu === undefined || (Array.isArray(entry.cpu) && entry.cpu.includes(TEST_PLATFORM.cpu)))) packages[location] = entry;
+  }
+  return { ...lock, packages };
 }
 
 export function createFixture(options: { claude?: boolean; hook?: boolean; git?: boolean } = {}): Fixture {
@@ -75,7 +139,23 @@ export function createFixture(options: { claude?: boolean; hook?: boolean; git?:
   for (const file of REPO_FILES) {
     cpSync(path.join(REPO_ROOT, file), path.join(repo, file), { recursive: true, preserveTimestamps: true });
   }
-  symlinkSync(path.join(REPO_ROOT, "node_modules"), path.join(repo, "node_modules"), "junction");
+  // node_modules는 레포의 진짜 폴더와 이어지지 않는 독립 폴더다. start.mjs가 불러오는 zod만 복사해 두고, 숨은 lock은 따로 만든다.
+  // 이어 두면 테스트 안에서 npm ci가 돌 때 진짜 node_modules를 지우거나 덮어쓴다.
+  mkdirSync(path.join(repo, "node_modules"));
+  cpSync(path.join(REPO_ROOT, "node_modules", "zod"), path.join(repo, "node_modules", "zod"), { recursive: true });
+  const readLock = (): LockFile => JSON.parse(readFileSync(path.join(repo, "package-lock.json"), "utf8")) as LockFile;
+  const readHiddenLock = (): LockFile => JSON.parse(readFileSync(path.join(repo, "node_modules", ".package-lock.json"), "utf8")) as LockFile;
+  const goodHiddenLock = path.join(root, "hidden-lock.good.json");
+  writeFileSync(goodHiddenLock, JSON.stringify(hiddenLockFrom(readLock())));
+  const hiddenLockFile = path.join(repo, "node_modules", ".package-lock.json");
+  copyFileSync(goodHiddenLock, hiddenLockFile);
+  // 숨은 lock이 가리키는 패키지 폴더. 설치 판정은 폴더의 package.json이 있는지도 본다. zod는 진짜를 복사해 뒀다.
+  for (const location of Object.keys(readHiddenLock().packages)) {
+    const file = path.join(repo, location, "package.json");
+    if (existsSync(file)) continue;
+    mkdirSync(path.dirname(file), { recursive: true });
+    writeFileSync(file, "{}");
+  }
   if (options.hook !== false) {
     mkdirSync(path.join(repo, "tools", "observer", "hooks"), { recursive: true });
     writeFileSync(path.join(repo, "tools", "observer", "hooks", "settings.json"), "{}\n");
@@ -99,6 +179,15 @@ export function createFixture(options: { claude?: boolean; hook?: boolean; git?:
     }
   }
 
+  const npmLogFile = path.join(root, "npm-log.jsonl");
+  writeFileSync(path.join(bin, "fake-npm.mjs"), FAKE_NPM);
+  if (process.platform === "win32") {
+    writeFileSync(path.join(bin, "npm.cmd"), `@"${process.execPath}" "%~dp0fake-npm.mjs" %*\r\n`);
+  } else {
+    writeFileSync(path.join(bin, "npm"), `#!/bin/sh\nexec "${process.execPath}" "${path.join(bin, "fake-npm.mjs")}" "$@"\n`);
+    chmodSync(path.join(bin, "npm"), 0o755);
+  }
+
   const databaseFile = path.join(root, "grabmarket.sqlite");
   writeFileSync(databaseFile, "");
 
@@ -112,10 +201,22 @@ export function createFixture(options: { claude?: boolean; hook?: boolean; git?:
     }
   }
 
-  const env: NodeJS.ProcessEnv = { ...process.env, HOME: home, USERPROFILE: home, DATABASE_PATH: databaseFile, FAKE_CLAUDE_LOG: claudeLogFile };
+  const env: NodeJS.ProcessEnv = { ...process.env, HOME: home, USERPROFILE: home, DATABASE_PATH: databaseFile, FAKE_CLAUDE_LOG: claudeLogFile, FAKE_NPM_LOG: npmLogFile, FAKE_NPM_HIDDEN_LOCK: goodHiddenLock };
   delete env.CLAUDE_CONFIG_DIR;
-  // 진짜 claude가 보이지 않도록 PATH에는 가짜 claude 폴더와 git 폴더만 둔다.
+  if (process.env.LAUNCHER_SIMULATE_PLATFORM !== undefined && process.env.LAUNCHER_SIMULATE_PLATFORM !== "") {
+    env.NODE_OPTIONS = `${env.NODE_OPTIONS ?? ""} --import ${pathToFileURL(SIMULATE_PLATFORM_FILE).href}`.trim();
+  }
+  // 진짜 claude·npm이 보이지 않도록 PATH에는 가짜 claude·npm 폴더와 git 폴더만 둔다.
   setPath(env, [bin, path.dirname(git)].join(path.delimiter));
+
+  // 진짜 npm이 잡히면 테스트가 실제로 설치를 시도한다. PATH에서 npm은 항상 가짜여야 한다.
+  const npm = findCommand("npm", {
+    platform: process.platform,
+    pathValue: env.PATH ?? env.Path ?? "",
+    pathExt: env.PATHEXT,
+    isExecutable: (file) => existsSync(file),
+  });
+  if (npm === null || path.dirname(npm) !== bin) throw new Error(`테스트 PATH의 npm이 가짜가 아닙니다: ${npm ?? "없음"}`);
 
   return {
     root,
@@ -131,6 +232,25 @@ export function createFixture(options: { claude?: boolean; hook?: boolean; git?:
             .split("\n")
             .map((line) => JSON.parse(line) as LogEntry)
         : [],
+    npmLog: () =>
+      existsSync(npmLogFile)
+        ? readFileSync(npmLogFile, "utf8")
+            .trim()
+            .split("\n")
+            .map((line) => JSON.parse(line) as NpmLogEntry)
+        : [],
+    hiddenLockFile,
+    readLock,
+    readHiddenLock,
+    replaceHiddenLockPackages: (replace) => {
+      const hidden = readHiddenLock();
+      writeFileSync(hiddenLockFile, JSON.stringify({ ...hidden, packages: replace(hidden.packages) }));
+    },
+    editHiddenLock: (edit) => {
+      const hidden = readHiddenLock();
+      edit(hidden.packages);
+      writeFileSync(hiddenLockFile, JSON.stringify(hidden));
+    },
     run: (script, args = [], runOptions = {}) =>
       spawnSync(process.execPath, [...(runOptions.nodeArgs ?? []), path.join(repo, script), ...args], {
         cwd: repo,
