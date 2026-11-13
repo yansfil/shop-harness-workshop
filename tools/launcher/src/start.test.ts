@@ -1,8 +1,9 @@
 import { spawn } from "node:child_process";
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, symlinkSync, utimesSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, rmSync, symlinkSync, utimesSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
+import { REPO_ROOT } from "./paths.ts";
 import { createFixture, originalClaudeState, type Fixture } from "./test-fixture.ts";
 
 let fixture: Fixture | null = null;
@@ -128,6 +129,22 @@ describe("node start.mjs", () => {
       expect(result.stdout).toContain("node_modules/.package-lock.json이 없습니다");
       expect(result.stdout).toContain("[4/7] 의존성: 새로 설치함 (npm ci)");
       expect(fixture.npmLog()).toEqual([{ args: ["ci"], cwd: fixture.repo }]);
+    });
+
+    it("고정물에서 npm ci가 돌아도 레포의 진짜 node_modules는 그대로다", () => {
+      fixture = createFixture();
+      const real = path.join(REPO_ROOT, "node_modules");
+      const snapshot = () => ({ entries: readdirSync(real).sort(), hidden: readFileSync(path.join(real, ".package-lock.json"), "utf8") });
+      const before = snapshot();
+      const fixtureModules = path.join(fixture.repo, "node_modules");
+      rmSync(fixture.hiddenLockFile);
+      const result = fixture.run("start.mjs", ["--check"]);
+
+      expect(result.status, result.stderr).toBe(0);
+      expect(fixture.npmLog()).toEqual([{ args: ["ci"], cwd: fixture.repo }]);
+      expect(snapshot()).toEqual(before);
+      const links = readdirSync(fixtureModules).filter((name) => lstatSync(path.join(fixtureModules, name)).isSymbolicLink());
+      expect(links).toEqual([]);
     });
 
     it("npm ci가 실패하면 압축 파일 안내와 함께 그 단계에서 멈춘다", () => {

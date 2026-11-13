@@ -2,10 +2,10 @@
 // 바깥 경계(claude 프로그램, HOME)만 가짜로 두고 start.mjs·cleanup.mjs는 실제 프로세스로 돌린다.
 import { spawnSync, type SpawnSyncReturns } from "node:child_process";
 import { createHash } from "node:crypto";
-import { chmodSync, copyFileSync, cpSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync, existsSync } from "node:fs";
+import { chmodSync, copyFileSync, cpSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync, existsSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { findHere } from "./command.ts";
+import { findCommand, findHere } from "./command.ts";
 import { REPO_ROOT } from "./paths.ts";
 
 const REPO_FILES = [
@@ -115,12 +115,10 @@ export function createFixture(options: { claude?: boolean; hook?: boolean; git?:
   for (const file of REPO_FILES) {
     cpSync(path.join(REPO_ROOT, file), path.join(repo, file), { recursive: true, preserveTimestamps: true });
   }
-  // node_modules는 항목마다 실제 폴더로 연결하고 숨은 lock만 따로 둔다. 숨은 lock을 고쳐도 실제 node_modules는 그대로다.
+  // node_modules는 레포의 진짜 폴더와 이어지지 않는 독립 폴더다. start.mjs가 불러오는 zod만 복사해 두고, 숨은 lock은 따로 만든다.
+  // 이어 두면 테스트 안에서 npm ci가 돌 때 진짜 node_modules를 지우거나 덮어쓴다.
   mkdirSync(path.join(repo, "node_modules"));
-  for (const entry of readdirSync(path.join(REPO_ROOT, "node_modules"))) {
-    if (entry === ".package-lock.json") continue;
-    symlinkSync(path.join(REPO_ROOT, "node_modules", entry), path.join(repo, "node_modules", entry), "junction");
-  }
+  cpSync(path.join(REPO_ROOT, "node_modules", "zod"), path.join(repo, "node_modules", "zod"), { recursive: true });
   const readLock = (): LockFile => JSON.parse(readFileSync(path.join(repo, "package-lock.json"), "utf8")) as LockFile;
   const readHiddenLock = (): LockFile => JSON.parse(readFileSync(path.join(repo, "node_modules", ".package-lock.json"), "utf8")) as LockFile;
   const goodHiddenLock = path.join(root, "hidden-lock.good.json");
@@ -176,6 +174,15 @@ export function createFixture(options: { claude?: boolean; hook?: boolean; git?:
   delete env.CLAUDE_CONFIG_DIR;
   // 진짜 claude·npm이 보이지 않도록 PATH에는 가짜 claude·npm 폴더와 git 폴더만 둔다.
   setPath(env, [bin, path.dirname(git)].join(path.delimiter));
+
+  // 진짜 npm이 잡히면 테스트가 실제로 설치를 시도한다. PATH에서 npm은 항상 가짜여야 한다.
+  const npm = findCommand("npm", {
+    platform: process.platform,
+    pathValue: env.PATH ?? env.Path ?? "",
+    pathExt: env.PATHEXT,
+    isExecutable: (file) => existsSync(file),
+  });
+  if (npm === null || path.dirname(npm) !== bin) throw new Error(`테스트 PATH의 npm이 가짜가 아닙니다: ${npm ?? "없음"}`);
 
   return {
     root,
