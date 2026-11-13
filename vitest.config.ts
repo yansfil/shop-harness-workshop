@@ -12,6 +12,7 @@ export default defineConfig({
             "apps/api/src/**/*.test.ts",
             "tools/*/src/**/*.test.ts",
             "tests/**/*.test.ts",
+            ".claude/hooks/*.test.mjs",
           ],
         },
       },
