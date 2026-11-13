@@ -9,7 +9,7 @@ import {
   type OrderStatus,
 } from "@grabmarket/contracts";
 import { memo, useCallback, useState } from "react";
-import { Form, Link, type LoaderFunctionArgs, useLoaderData } from "react-router";
+import { Form, Link, type LoaderFunctionArgs, Navigate, useLoaderData, useRevalidator } from "react-router";
 import { type ApiError, callApi, isApiError } from "../api/client.ts";
 import { Button, LinkButton } from "../components/button.tsx";
 import { Icon } from "../components/icon.tsx";
@@ -125,13 +125,8 @@ function OrderList({ search, data }: { search: AdminOrderSearch; data: AdminOrde
           )}
         </div>
       ) : data.orders.length === 0 ? (
-        <div className="rounded-md border border-line bg-ground">
-          <EmptyState title="이 페이지에는 주문이 없어요" hint={`전체 ${data.pageCount.toLocaleString("ko-KR")}쪽까지 있어요`}>
-            <LinkButton to={adminOrdersPath({ ...search, page: 1 })} variant="secondary">
-              첫 페이지로
-            </LinkButton>
-          </EmptyState>
-        </div>
+        // 주소의 쪽이 끝을 넘었거나(직접 입력), 마지막 쪽의 주문이 조건 밖으로 빠졌다. 남은 마지막 쪽으로 옮긴다.
+        <Navigate to={adminOrdersPath({ ...search, page: data.pageCount })} replace />
       ) : (
         <OrderTable search={search} data={data} />
       )}
@@ -163,7 +158,7 @@ const th = "sticky top-0 bg-ground font-normal";
 
 function OrderTable({ search, data }: { search: AdminOrderSearch; data: AdminOrderListResponse }) {
   const { orders } = data;
-  const [statuses, setStatuses] = useState<Record<number, OrderStatus>>({});
+  const revalidator = useRevalidator();
   const [busy, setBusy] = useState<ReadonlySet<number>>(new Set());
   const [failed, setFailed] = useState<ReadonlySet<number>>(new Set());
 
@@ -171,8 +166,9 @@ function OrderTable({ search, data }: { search: AdminOrderSearch; data: AdminOrd
     setBusy((current) => new Set(current).add(id));
     setFailed((current) => without(current, id));
     callApi("changeOrderStatus", { params: { orderId: id }, body: { status: to } }).then(
-      ({ order }) => {
-        setStatuses((current) => ({ ...current, [id]: order.status }));
+      () => {
+        // 바뀐 주문이 지금 조건(상태 필터·쪽)에 아직 맞는지, 칩 개수와 쪽 수가 어떻게 되는지는 서버만 안다. 같은 조건으로 다시 받는다.
+        void revalidator.revalidate();
         setBusy((current) => without(current, id));
       },
       (error: unknown) => {
@@ -181,7 +177,7 @@ function OrderTable({ search, data }: { search: AdminOrderSearch; data: AdminOrd
         setFailed((current) => new Set(current).add(id));
       },
     );
-  }, []);
+  }, [revalidator]);
 
   const first = ((data.page ?? 1) - 1) * data.pageSize + 1;
   return (
@@ -218,7 +214,6 @@ function OrderTable({ search, data }: { search: AdminOrderSearch; data: AdminOrd
               <OrderRow
                 key={order.id}
                 order={order}
-                status={statuses[order.id] ?? order.status}
                 busy={busy.has(order.id)}
                 failed={failed.has(order.id)}
                 onAdvance={advance}
@@ -283,18 +278,16 @@ function Pager({ search, page, pageCount }: { search: AdminOrderSearch; page: nu
 
 const OrderRow = memo(function OrderRow({
   order,
-  status,
   busy,
   failed,
   onAdvance,
 }: {
   order: AdminOrderRow;
-  status: OrderStatus;
   busy: boolean;
   failed: boolean;
   onAdvance: (id: number, to: OrderStatus) => void;
 }) {
-  const next = nextOf(status);
+  const next = nextOf(order.status);
   return (
     <tr className="h-12 border-t border-line">
       <td className="px-6 font-extrabold text-ink">
@@ -307,7 +300,7 @@ const OrderRow = memo(function OrderRow({
       <td className="px-3 text-right font-extrabold text-ink">{krw(order.total)}</td>
       <td className="px-3 text-ink-2">{formatShortTime(order.createdAt)}</td>
       <td className="px-3">
-        <StatusBadge status={status} />
+        <StatusBadge status={order.status} />
       </td>
       <td className="px-6 text-right">
         {next !== null && (

@@ -1,4 +1,4 @@
-import type { AdminOrderListResponse, AdminOrderRow, OrderStatus } from "@grabmarket/contracts";
+import type { AdminOrderDetail, AdminOrderListResponse, AdminOrderRow, OrderStatus } from "@grabmarket/contracts";
 import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
@@ -31,6 +31,29 @@ function listing(overrides: Partial<AdminOrderListResponse> = {}): AdminOrderLis
     pageCount: 3,
     nextCursor: null,
     ...overrides,
+  };
+}
+
+/** 상태 변경 응답(계약 모양). 화면은 이 안의 status를 쓰지 않고 목록을 다시 받는다. */
+function changed(id: number, status: OrderStatus): { json: { order: AdminOrderDetail } } {
+  return {
+    json: {
+      order: {
+        id,
+        orderNumber: `GM-20261114-${String(id).padStart(4, "0")}`,
+        status,
+        items: [{ productId: 1, productName: "제주 감귤 3kg", imageUrl: "/images/products/p1.webp", unitPrice: 17_900, quantity: 1, lineTotal: 17_900 }],
+        subtotal: 17_900,
+        shippingFee: 0,
+        total: 17_900,
+        paymentMethod: "virtual",
+        shipping: { recipientName: "김하늘", phone: "010-0000-0000", address: "서울특별시 한울구 새벽로 12, 302호" },
+        createdAt: "2026-11-14T03:00:00.000Z",
+        updatedAt: "2026-11-14T03:05:00.000Z",
+        customer: { id: 2, name: "김하늘", email: "sky@grabmarket.test" },
+        nextStatus: "shipping",
+      },
+    },
   };
 }
 
@@ -86,6 +109,49 @@ describe("관리자 주문 목록 (B13 과제 정답)", () => {
 
     expect(await screen.findByText("25건 중 11–11")).toBeInTheDocument();
     expect(api.requests).toContain("GET /api/admin/orders?page=2");
+  });
+
+  it("상태를 바꾸면 현재 조건으로 목록과 칩 개수를 서버에서 다시 받는다", async () => {
+    loginAsAdmin();
+    let done = false;
+    api.on("GET /api/admin/orders", ({ url }) => {
+      const paid = url.searchParams.get("status") === "paid";
+      if (!done) return { json: listing({ total: 2, orders: [row(2), row(1)], pageCount: 1, statusCounts: { all: 2, paid: 2, preparing: 0, shipping: 0, delivered: 0 } }) };
+      return { json: listing({ total: paid ? 1 : 2, orders: paid ? [row(1)] : [row(2, "preparing"), row(1)], pageCount: 1, statusCounts: { all: 2, paid: 1, preparing: 1, shipping: 0, delivered: 0 } }) };
+    });
+    api.on("POST /api/admin/orders/2/status", () => {
+      done = true;
+      return changed(2, "preparing");
+    });
+    renderApp("/admin/orders?status=paid");
+    expect(await screen.findByText("2건 중 1–2")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "GM-20261114-0002 배송준비로 변경" }));
+
+    expect(await screen.findByText("1건 중 1–1")).toBeInTheDocument();
+    expect(screen.queryByText("GM-20261114-0002")).not.toBeInTheDocument();
+    const chips = within(screen.getByRole("navigation", { name: "상태" }));
+    expect(chips.getAllByRole("link").map((link) => link.textContent)).toEqual(["전체2", "결제완료1", "배송준비1", "배송중0", "배송완료0"]);
+  });
+
+  it("마지막 쪽의 마지막 주문을 바꾸면 그 쪽이 비지 않고 남은 쪽을 보인다", async () => {
+    loginAsAdmin();
+    let done = false;
+    api.on("GET /api/admin/orders", ({ url }) => {
+      const page = Number(url.searchParams.get("page") ?? "1");
+      if (!done) return { json: listing({ page, total: 11, orders: [row(1)], pageCount: 2 }) };
+      return { json: listing({ page, total: 10, orders: page === 1 ? [row(10)] : [], pageCount: 1 }) };
+    });
+    api.on("POST /api/admin/orders/1/status", () => {
+      done = true;
+      return changed(1, "preparing");
+    });
+    renderApp("/admin/orders?page=2");
+    await screen.findByText("11건 중 11–11");
+
+    await userEvent.click(screen.getByRole("button", { name: "GM-20261114-0001 배송준비로 변경" }));
+
+    expect(await screen.findByText("10건 중 1–1")).toBeInTheDocument();
   });
 
   it("조건에 맞는 주문이 없으면 안내와 조건 지우기를 보인다", async () => {
