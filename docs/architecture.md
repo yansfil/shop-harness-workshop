@@ -53,3 +53,27 @@ SQLite 파일은 `data/` 아래에 있고 git에 올리지 않습니다.
 ## 환경 변수
 
 키 목록과 기본값은 `apps/api/src/config.ts`의 `ENV_REGISTRY` 한 곳에 있고, `.env.example`이 같은 키를 보입니다.
+
+## 시드와 교육용 계정
+
+`npm run db:reset`은 모든 테이블을 지우고 마이그레이션과 시드를 다시 적용합니다.
+시드는 고정 기준일(2026-11-14)과 고정 난수로 만들어서 누가 돌려도 같은 데이터가 나옵니다.
+끝에 보여 주는 시드 해시가 같으면 같은 데이터입니다.
+
+| 데이터 | 규모 |
+| --- | --- |
+| 계정 | 관리자 1명, 로그인 고객 2명, 주문만 가진 고객 200명 |
+| 상품 | 120개(기본 상품 40개 × 변형), 이미지는 `apps/web/public/images/products/<key>.webp` 40장 |
+| 재고 | 일부 품절, 5개 이하, 안전재고 미만 |
+| 주문 | 180일에 걸친 약 5,000건, 같은 시각에 들어온 묶음 포함 |
+
+로그인 화면에 적어 두는 교육용 계정입니다.
+
+| 역할 | 이메일 | 비밀번호 |
+| --- | --- | --- |
+| 고객 1 | `customer1@grabmarket.test` | `grab1234!` |
+| 고객 2 | `customer2@grabmarket.test` | `grab1234!` |
+| 관리자 | `admin@grabmarket.test` | `admin1234!` |
+
+`npm run orders:simulate`는 몇 초마다 새 주문을 만들고 Ctrl+C로 멈춥니다.
+`npm run mcp:db`는 읽기 전용 DB MCP 서버(stdio)를 띄웁니다. 도구는 테이블 목록, 테이블 구조, SELECT 셋뿐입니다.
