@@ -52,7 +52,7 @@ function repoWith(wanted: Packages, installed: Packages | null, options: { witho
 }
 
 describe("hasReleaseFile", () => {
-  it("Release 압축 파일은 Windows x64와 Mac arm64뿐이다(D-35)", () => {
+  it("Release 압축 파일은 Windows x64와 Mac arm64뿐이다", () => {
     expect([MAC_ARM, { os: "win32", cpu: "x64" }, MAC_INTEL, { os: "linux", cpu: "x64" }, { os: "win32", cpu: "arm64" }].map(hasReleaseFile)).toEqual([true, true, false, false, false]);
   });
 });

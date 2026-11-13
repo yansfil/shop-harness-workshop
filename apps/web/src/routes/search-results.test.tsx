@@ -9,7 +9,7 @@ const api = installFakeApi();
 const results = () => screen.getByRole("region", { name: "검색 결과" });
 const names = () => within(results()).getAllByRole("link").map((link) => link.textContent);
 
-describe("검색 결과 (B49)", () => {
+describe("검색 결과", () => {
   it("총 개수와 정렬 3종을 보이고 페이지 번호나 더보기는 없다", async () => {
     renderApp("/search?q=" + encodeURIComponent("감귤"));
 
@@ -45,7 +45,7 @@ describe("검색 결과 (B49)", () => {
   });
 });
 
-describe("필터 (B50)", () => {
+describe("필터", () => {
   it("카테고리 칩에 개수가 있고, 개수가 0인 칩은 누를 수 없다", async () => {
     renderApp("/search?q=" + encodeURIComponent("감귤"));
     await screen.findByText("총 3개");
@@ -100,7 +100,7 @@ describe("필터 (B50)", () => {
   });
 });
 
-describe("결과 없음 (B51)", () => {
+describe("결과 없음", () => {
   it("다른 상품으로 채우지 않고 안내·철자 팁·카테고리 칩 4개·전체 상품 보기를 보인다", async () => {
     renderApp("/search?q=" + encodeURIComponent("ㅁㄴㅇㄹ"));
 
@@ -114,7 +114,7 @@ describe("결과 없음 (B51)", () => {
   });
 });
 
-describe("검색 결과 실패 (B17)", () => {
+describe("검색 결과 실패", () => {
   it("못 불러오면 안내와 다시 시도를 보이고, 다시 시도하면 결과가 나온다", async () => {
     let calls = 0;
     api.on("GET /api/products", ({ url }) => {

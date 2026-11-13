@@ -24,12 +24,16 @@ export function countSessions(configDir: string): number {
   return count;
 }
 
-/** git worktree list --porcelain 출력에서 본 checkout(첫 항목)을 뺀 실습 worktree 경로들. */
+/**
+ * git worktree list --porcelain 출력에서 본 checkout(첫 항목)을 뺀 실습 worktree 경로들.
+ * git은 Windows에서도 슬래시 경로(C:/Users/...)를 주므로 path.resolve로 OS 모양(C:\Users\...)으로 맞춘다.
+ * 사용자에게 보이는 경로와 설정 폴더·fixture 경로 비교가 한 모양이 된다.
+ */
 export function parseLinkedWorktrees(porcelain: string): string[] {
   const paths = porcelain
     .split(/\r?\n/)
     .filter((line) => line.startsWith("worktree "))
-    .map((line) => line.slice("worktree ".length));
+    .map((line) => path.resolve(line.slice("worktree ".length)));
   return paths.slice(1);
 }
 
