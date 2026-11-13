@@ -140,6 +140,8 @@ export const AdminOrderRowSchema = z.object({
   status: OrderStatusSchema,
   total: MoneySchema,
   itemCount: z.number().int().positive(),
+  /** 목록 표기: "제주 감귤 3kg 외 2건"의 앞부분(첫 상품 이름) */
+  firstItemName: z.string(),
   createdAt: DateTimeSchema,
 });
 export type AdminOrderRow = z.infer<typeof AdminOrderRowSchema>;

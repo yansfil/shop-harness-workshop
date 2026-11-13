@@ -55,6 +55,7 @@ export function toAdminOrderListDto(rows: AdminOrderRow[]): AdminOrderListRespon
       status: row.status,
       total: row.total,
       itemCount: row.itemCount,
+      firstItemName: row.firstItemName,
       createdAt: row.createdAt.toISOString(),
     })),
   };
