@@ -42,12 +42,20 @@ if (process.env.FAKE_CLAUDE_WAIT_FOR_INTERRUPT === "1") {
 // 진짜 npm 대신 PATH에 두는 가짜 npm. 네트워크·설치 없이 부른 인자만 남긴다.
 // ci는 미리 만들어 둔 "정상 설치" 숨은 lock을 node_modules에 복사한다(FAKE_NPM_EXIT가 0이 아니면 아무것도 하지 않고 실패한다).
 const FAKE_NPM = `
-import { appendFileSync, copyFileSync } from "node:fs";
+import { appendFileSync, copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 const args = process.argv.slice(2);
 appendFileSync(process.env.FAKE_NPM_LOG, JSON.stringify({ args, cwd: process.cwd() }) + "\\n");
 const exit = Number(process.env.FAKE_NPM_EXIT ?? "0");
-if (exit === 0 && args[0] === "ci") copyFileSync(process.env.FAKE_NPM_HIDDEN_LOCK, path.join(process.cwd(), "node_modules", ".package-lock.json"));
+if (exit === 0 && args[0] === "ci") {
+  copyFileSync(process.env.FAKE_NPM_HIDDEN_LOCK, path.join(process.cwd(), "node_modules", ".package-lock.json"));
+  for (const location of Object.keys(JSON.parse(readFileSync(process.env.FAKE_NPM_HIDDEN_LOCK, "utf8")).packages)) {
+    const file = path.join(process.cwd(), location, "package.json");
+    if (existsSync(file)) continue;
+    mkdirSync(path.dirname(file), { recursive: true });
+    writeFileSync(file, "{}");
+  }
+}
 process.exit(exit);
 `;
 
@@ -79,6 +87,8 @@ export interface Fixture {
   readLock: () => LockFile;
   /** 임시 레포의 숨은 lock을 읽은 내용 */
   readHiddenLock: () => LockFile;
+  /** 숨은 lock의 packages를 통째로 바꿔 쓴다. */
+  replaceHiddenLockPackages: (replace: (packages: LockFile["packages"]) => LockFile["packages"]) => void;
   /** 숨은 lock의 packages를 고쳐 쓴다. */
   editHiddenLock: (edit: (packages: Record<string, Record<string, unknown>>) => void) => void;
   run: (script: "start.mjs" | "cleanup.mjs", args?: string[], options?: { input?: string; nodeArgs?: string[] }) => SpawnSyncReturns<string>;
@@ -95,11 +105,13 @@ export interface LockFile {
   packages: Record<string, Record<string, unknown>>;
 }
 
-/** 모든 optional 패키지를 건너뛴 채 설치했을 때 npm이 남기는 숨은 lock(루트 없음). */
+/** 이 컴퓨터에서 설치했을 때 npm이 남기는 숨은 lock(루트 없음): optional은 이 OS·CPU용 바이너리만 든다. */
 function hiddenLockFrom(lock: LockFile): LockFile {
   const packages: LockFile["packages"] = {};
   for (const [location, entry] of Object.entries(lock.packages)) {
-    if (location !== "" && entry.optional !== true) packages[location] = entry;
+    if (location === "") continue;
+    if (entry.optional !== true) packages[location] = entry;
+    else if (Array.isArray(entry.os) && entry.os.includes(process.platform) && (entry.cpu === undefined || (Array.isArray(entry.cpu) && entry.cpu.includes(process.arch)))) packages[location] = entry;
   }
   return { ...lock, packages };
 }
@@ -125,6 +137,13 @@ export function createFixture(options: { claude?: boolean; hook?: boolean; git?:
   writeFileSync(goodHiddenLock, JSON.stringify(hiddenLockFrom(readLock())));
   const hiddenLockFile = path.join(repo, "node_modules", ".package-lock.json");
   copyFileSync(goodHiddenLock, hiddenLockFile);
+  // 숨은 lock이 가리키는 패키지 폴더. 설치 판정은 폴더의 package.json이 있는지도 본다. zod는 진짜를 복사해 뒀다.
+  for (const location of Object.keys(readHiddenLock().packages)) {
+    const file = path.join(repo, location, "package.json");
+    if (existsSync(file)) continue;
+    mkdirSync(path.dirname(file), { recursive: true });
+    writeFileSync(file, "{}");
+  }
   if (options.hook !== false) {
     mkdirSync(path.join(repo, "tools", "observer", "hooks"), { recursive: true });
     writeFileSync(path.join(repo, "tools", "observer", "hooks", "settings.json"), "{}\n");
@@ -208,6 +227,10 @@ export function createFixture(options: { claude?: boolean; hook?: boolean; git?:
     hiddenLockFile,
     readLock,
     readHiddenLock,
+    replaceHiddenLockPackages: (replace) => {
+      const hidden = readHiddenLock();
+      writeFileSync(hiddenLockFile, JSON.stringify({ ...hidden, packages: replace(hidden.packages) }));
+    },
     editHiddenLock: (edit) => {
       const hidden = readHiddenLock();
       edit(hidden.packages);

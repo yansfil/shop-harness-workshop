@@ -94,7 +94,7 @@ describe("node start.mjs", () => {
     it("이 컴퓨터에 설치되지 않는 optional 바이너리가 숨은 lock에 없어도 설치된 것으로 본다", () => {
       fixture = createFixture();
       const lock = fixture.readLock();
-      const skipped = Object.entries(lock.packages).filter(([, entry]) => entry.optional === true && entry.os !== undefined);
+      const skipped = Object.entries(lock.packages).filter(([, entry]) => entry.optional === true && Array.isArray(entry.os) && !entry.os.includes(process.platform));
       expect(skipped.length).toBeGreaterThan(0);
       const installed = fixture.readHiddenLock().packages;
       expect(skipped.every(([location]) => !(location in installed))).toBe(true);
@@ -115,8 +115,37 @@ describe("node start.mjs", () => {
       const result = fixture.run("start.mjs", ["--check"]);
 
       expect(result.status, result.stderr).toBe(0);
-      expect(result.stdout).toContain(`${location}의 설치된 버전(0.0.1)`);
+      expect(result.stdout).toContain(`${location}의 버전이`);
+      expect(result.stdout).toContain("설치된 것: 0.0.1");
       expect(result.stdout).toContain("[4/7] 의존성: 새로 설치함 (npm ci)");
+      expect(fixture.npmLog()).toEqual([{ args: ["ci"], cwd: fixture.repo }]);
+    });
+
+    it("이 컴퓨터용 optional 바이너리가 빠진 node_modules(다른 OS·CPU용 압축 파일)는 npm ci를 부른다", () => {
+      fixture = createFixture();
+      const here = Object.entries(fixture.readHiddenLock().packages).find(
+        ([, entry]) => entry.optional === true && Array.isArray(entry.os) && Array.isArray(entry.cpu) && entry.os.includes(process.platform) && entry.cpu.includes(process.arch),
+      );
+      if (here === undefined) throw new Error("이 컴퓨터용 optional 바이너리가 package-lock.json에 없습니다.");
+      const missing = here[0];
+      fixture.replaceHiddenLockPackages((packages) => Object.fromEntries(Object.entries(packages).filter(([name]) => name !== missing)));
+      const result = fixture.run("start.mjs", ["--check"]);
+
+      expect(result.status, result.stderr).toBe(0);
+      expect(result.stdout).toContain(here[0]);
+      expect(result.stdout).toContain("[4/7] 의존성: 새로 설치함 (npm ci)");
+      expect(fixture.npmLog()).toEqual([{ args: ["ci"], cwd: fixture.repo }]);
+    });
+
+    it("패키지 폴더가 빠진 node_modules(압축 해제가 건너뜀)는 이유와 함께 npm ci를 부른다", () => {
+      fixture = createFixture();
+      const location = Object.keys(fixture.readHiddenLock().packages).find((name) => name.startsWith("node_modules/") && !name.startsWith("node_modules/zod"));
+      if (location === undefined) throw new Error("테스트에 쓸 패키지가 없습니다.");
+      rmSync(path.join(fixture.repo, location), { recursive: true, force: true });
+      const result = fixture.run("start.mjs", ["--check"]);
+
+      expect(result.status, result.stderr).toBe(0);
+      expect(result.stdout).toContain(`${location}/package.json이 없습니다`);
       expect(fixture.npmLog()).toEqual([{ args: ["ci"], cwd: fixture.repo }]);
     });
 
