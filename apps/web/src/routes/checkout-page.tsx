@@ -10,7 +10,7 @@ import { Loaded } from "../components/loaded.tsx";
 import { OrderLines } from "../components/order-lines.tsx";
 import { Page } from "../components/page.tsx";
 import { Bone, EmptyState } from "../components/states.tsx";
-import { AmountRows, SummaryCard } from "../components/summary-box.tsx";
+import { AmountRows, FreeShippingHint, SummaryCard } from "../components/summary-box.tsx";
 import { effectiveQuantity, isOrderable, loadPricedLines, type PricedLine } from "../lib/cart-products.ts";
 import { krw } from "../lib/format.ts";
 import { loginPath } from "../lib/login-path.ts";
@@ -234,12 +234,13 @@ function CheckoutView({ rows, direct }: { rows: PricedLine[]; direct: boolean })
           <div className="mt-6">{payButton}</div>
         </SummaryCard>
       </aside>
-      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-ground p-4 lg:hidden">
+      <div role="region" aria-label="하단 결제 요약" className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-ground p-4 lg:hidden">
         {pay.status === "failed" && <PayFailure error={pay.error} />}
         <div className="flex items-center justify-between text-xs-plus text-ink-2">
           <span>상품 합계 {amounts !== null ? krw(amounts.subtotal) : "-"}</span>
           <span>배송비 {amounts !== null ? krw(amounts.shippingFee) : "-"}</span>
         </div>
+        {amounts !== null && <FreeShippingHint remaining={amounts.freeShippingRemaining} className="mt-1" />}
         <div className="mt-1 mb-3 flex items-center justify-between">
           <span className="text-sm font-bold text-ink">결제 금액</span>
           <span className="text-2xl leading-8 font-extrabold text-ink">{amounts !== null ? krw(amounts.total) : "-"}</span>
