@@ -11,6 +11,7 @@ import { planCustomers, type SeedCustomer } from "./customers.ts";
 import { Prng } from "./prng.ts";
 import { SEED_CATEGORIES, SEED_PRODUCTS } from "./product-catalog.ts";
 import { SeedClock } from "./seed-clock.ts";
+import { seedLegacyData } from "../legacy/legacySeed.ts";
 
 /** 고정 기준일: 시드의 "오늘". 주문은 이 날부터 180일 전까지 걸쳐 있다. */
 export const SEED_BASE_DATE = new Date("2026-11-14T00:00:00.000Z");
@@ -55,7 +56,7 @@ export function seedDatabase(db: Database): void {
   services.uow.run(() => {
     const customers = insertAccounts(db, prng);
     const products = insertProducts(db, prng, clock);
-    const orders = planOrders(prng, customers, products);
+    const orders = featureDemoOrders(planOrders(prng, customers, products), customers);
     const events = planEvents(prng, products, orders);
     for (const event of events) {
       clock.set(event.at);
@@ -82,6 +83,45 @@ export function seedDatabase(db: Database): void {
       }
     }
   });
+  services.uow.run(() => {
+    seedLegacyData(db, services, SEED_BASE_DATE);
+  });
+}
+
+/** 로그인 고객 2명이 최근 며칠 동안 단계마다 주문을 하나씩 갖도록, 최근 주문 몇 건의 고객과 진행 단계를 정한다. */
+const DEMO_RECENT_ORDERS: readonly { customer: 0 | 1; ageDays: number; steps: number }[] = [
+  { customer: 0, ageDays: 0.15, steps: 0 },
+  { customer: 0, ageDays: 0.6, steps: 0 },
+  { customer: 0, ageDays: 1.3, steps: 1 },
+  { customer: 0, ageDays: 2.2, steps: 2 },
+  { customer: 0, ageDays: 3.1, steps: 3 },
+  { customer: 0, ageDays: 4.4, steps: 3 },
+  { customer: 0, ageDays: 5.8, steps: 3 },
+  { customer: 1, ageDays: 0.3, steps: 0 },
+  { customer: 1, ageDays: 1.1, steps: 1 },
+  { customer: 1, ageDays: 2.6, steps: 2 },
+  { customer: 1, ageDays: 3.6, steps: 3 },
+  { customer: 1, ageDays: 5.1, steps: 3 },
+];
+
+function featureDemoOrders(orders: PlannedOrder[], customers: SessionUser[]): PlannedOrder[] {
+  const taken = new Set<number>();
+  for (const target of DEMO_RECENT_ORDERS) {
+    const customer = customers[target.customer];
+    if (customer === undefined) throw new Error("로그인 고객이 없습니다");
+    const wantedMs = SEED_BASE_DATE.getTime() - target.ageDays * DAY_MS;
+    let best = -1;
+    for (const [index, order] of orders.entries()) {
+      if (taken.has(index)) continue;
+      const current = orders[best];
+      if (best === -1 || (current !== undefined && Math.abs(order.at.getTime() - wantedMs) < Math.abs(current.at.getTime() - wantedMs))) best = index;
+    }
+    const chosen = orders[best];
+    if (chosen === undefined) throw new Error("최근 주문이 없습니다");
+    taken.add(best);
+    orders[best] = { ...chosen, customer, steps: target.steps };
+  }
+  return orders;
 }
 
 function demoAdmin(): (typeof DEMO_ACCOUNTS)[number] {
