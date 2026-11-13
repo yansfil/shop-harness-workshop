@@ -1,6 +1,7 @@
 import { type InventoryItem, type InventoryMovement, MOVEMENT_KIND_LABELS } from "@grabmarket/contracts";
 import { useRef, useState } from "react";
 import { useLoaderData } from "react-router";
+import { streamed } from "../lib/streamed.ts";
 import { callApi, isApiError } from "../api/client.ts";
 import { Button } from "../components/button.tsx";
 import { Icon } from "../components/icon.tsx";
@@ -10,7 +11,7 @@ import { formatShortTime } from "../lib/format.ts";
 import { useAsync } from "../lib/use-async.ts";
 
 export function inventoryLoader() {
-  return { result: callApi("listInventory") };
+  return { result: streamed(callApi("listInventory")) };
 }
 
 export function AdminInventoryPage() {

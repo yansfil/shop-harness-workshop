@@ -127,7 +127,7 @@ export function SearchBox({ initialQuery }: { initialQuery: string }) {
         </button>
       </form>
       {open && (
-        <div className="fixed inset-x-0 bottom-0 overflow-y-auto border-t border-layer-edge bg-ground md:absolute md:inset-x-auto md:top-full md:bottom-auto md:left-0 md:mt-2 md:w-190 md:rounded-md md:border">
+        <div role="region" aria-label="검색어 도우미" className="fixed inset-x-0 bottom-0 overflow-y-auto border-t border-layer-edge bg-ground md:absolute md:inset-x-auto md:top-full md:bottom-auto md:left-0 md:mt-2 md:w-190 md:rounded-md md:border">
           {trimmed === "" ? (
             <RecentLayer recents={recents} categories={categories} rows={rows} active={active} onChoose={choose} onClose={close} />
           ) : (
@@ -290,6 +290,7 @@ function SuggestLayer({
               <li key={`product-${row.id}`}>
                 <Link
                   to={`/products/${row.id}`}
+                  aria-label={row.name}
                   onClick={(event) => {
                     event.preventDefault();
                     onChoose(row);

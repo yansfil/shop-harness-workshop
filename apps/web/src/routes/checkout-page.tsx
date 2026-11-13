@@ -1,3 +1,4 @@
+import { streamed } from "../lib/streamed.ts";
 import type { ShippingInfo, StockShortage } from "@grabmarket/contracts";
 import { PAYMENT_METHOD_LABELS } from "@grabmarket/contracts";
 import { useRef, useState } from "react";
@@ -25,11 +26,11 @@ export function checkoutLoader({ request }: LoaderFunctionArgs) {
   if (params.has("productId")) {
     if (!Number.isInteger(productId) || productId < 1 || !Number.isInteger(quantity) || quantity < 1 || quantity > 99) return redirect("/");
     const lines: CartLine[] = [{ productId, quantity, selected: true }];
-    return { direct: true, rows: loadPricedLines(lines) };
+    return { direct: true, rows: streamed(loadPricedLines(lines)) };
   }
   const lines = selectedCartLines();
   if (lines.length === 0) return redirect("/cart");
-  return { direct: false, rows: loadPricedLines(lines) };
+  return { direct: false, rows: streamed(loadPricedLines(lines)) };
 }
 
 export function CheckoutPage() {

@@ -1,3 +1,4 @@
+import { streamed } from "../lib/streamed.ts";
 import { useMemo, useState } from "react";
 import { Link, useLoaderData, useNavigate } from "react-router";
 import { AdminOrderNotice } from "../components/admin-order-notice.tsx";
@@ -17,7 +18,7 @@ import { cartStore, removeFromCart, setCartQuantity, setCartSelected, useCartLin
 import { useRootData } from "../state/root-data.ts";
 
 export function cartLoader() {
-  return { rows: loadPricedLines(cartStore.get()) };
+  return { rows: streamed(loadPricedLines(cartStore.get())) };
 }
 
 export function CartPage() {

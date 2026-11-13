@@ -1,5 +1,6 @@
 import type { ProductSearchResponse } from "@grabmarket/contracts";
 import { useLoaderData } from "react-router";
+import { streamed } from "../lib/streamed.ts";
 import { callApi } from "../api/client.ts";
 import { Loaded } from "../components/loaded.tsx";
 import { Page } from "../components/page.tsx";
@@ -8,7 +9,7 @@ import { EmptyState } from "../components/states.tsx";
 import { ProductListHeading } from "./product-list.tsx";
 
 export function homeLoader() {
-  return { result: callApi("searchProducts", { query: {} }) };
+  return { result: streamed(callApi("searchProducts", { query: {} })) };
 }
 
 export function HomePage() {

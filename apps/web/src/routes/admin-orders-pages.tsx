@@ -1,3 +1,4 @@
+import { streamed } from "../lib/streamed.ts";
 import {
   type AdminOrderDetail,
   type AdminOrderRow,
@@ -36,7 +37,7 @@ function without<T>(set: ReadonlySet<T>, value: T): Set<T> {
 // ---- 주문 목록: 전체 주문을 필터·검색·페이지 나누기 없이 한 화면에 ----
 
 export function adminOrdersLoader() {
-  return { result: callApi("listAdminOrders") };
+  return { result: streamed(callApi("listAdminOrders")) };
 }
 
 export function AdminOrdersPage() {
@@ -207,7 +208,7 @@ const OrderRow = memo(function OrderRow({
 export function adminOrderLoader({ params }: LoaderFunctionArgs) {
   const parsed = OrderParamsSchema.safeParse(params);
   if (!parsed.success) throw new NotFoundError("찾을 수 없는 주문입니다");
-  return { result: callApi("getAdminOrder", { params: { orderId: parsed.data.orderId } }) };
+  return { result: streamed(callApi("getAdminOrder", { params: { orderId: parsed.data.orderId } })) };
 }
 
 export function AdminOrderPage() {

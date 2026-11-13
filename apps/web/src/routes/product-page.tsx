@@ -1,6 +1,7 @@
 import { type ProductDetail, ProductParamsSchema } from "@grabmarket/contracts";
 import { useEffect, useState } from "react";
 import { Link, type LoaderFunctionArgs, useLoaderData, useNavigate } from "react-router";
+import { streamed } from "../lib/streamed.ts";
 import { callApi } from "../api/client.ts";
 import { Button, LinkButton } from "../components/button.tsx";
 import { Loaded } from "../components/loaded.tsx";
@@ -19,7 +20,7 @@ export function productLoader({ params }: LoaderFunctionArgs) {
   if (!parsed.success) throw new NotFoundError("찾을 수 없는 상품입니다");
   const product = callApi("getProduct", { params: { productId: parsed.data.productId } });
   const related = product.then((data) => callApi("searchProducts", { query: { category: data.product.category.slug } }));
-  return { product, related };
+  return { product: streamed(product), related: streamed(related) };
 }
 
 export function ProductPage() {

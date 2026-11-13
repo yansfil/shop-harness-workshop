@@ -1,6 +1,7 @@
 import type { ProductSearchResponse } from "@grabmarket/contracts";
 import { useState } from "react";
 import { Link, type LoaderFunctionArgs, useLoaderData, useSearchParams } from "react-router";
+import { streamed } from "../lib/streamed.ts";
 import { callApi } from "../api/client.ts";
 import { Button, LinkButton } from "../components/button.tsx";
 import { Checkbox } from "../components/checkbox.tsx";
@@ -17,7 +18,7 @@ import { useRootData } from "../state/root-data.ts";
 export function searchLoader({ request }: LoaderFunctionArgs) {
   const parsed = parseSearchParams(new URL(request.url).searchParams);
   if (parsed === null) throw new NotFoundError("검색 조건이 올바르지 않습니다");
-  return { q: parsed.query.q ?? "", result: callApi("searchProducts", { query: parsed.input }) };
+  return { q: parsed.query.q ?? "", result: streamed(callApi("searchProducts", { query: parsed.input })) };
 }
 
 export function SearchPage() {

@@ -46,6 +46,7 @@ export const PRICE_BUCKETS: readonly PriceBucket[] = [
 
 /** 현재 가격 조건 안에 통째로 들어가는 구간 번호들 */
 export function checkedBuckets(query: Pick<ProductSearchQuery, "minPrice" | "maxPrice">): number[] {
+  if (query.minPrice === undefined && query.maxPrice === undefined) return [];
   const low = query.minPrice ?? 0;
   const high = query.maxPrice ?? Number.POSITIVE_INFINITY;
   const checked: number[] = [];

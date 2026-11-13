@@ -1,5 +1,6 @@
 import { CategorySlugSchema } from "@grabmarket/contracts";
 import { type LoaderFunctionArgs, useLoaderData } from "react-router";
+import { streamed } from "../lib/streamed.ts";
 import { callApi } from "../api/client.ts";
 import { Loaded } from "../components/loaded.tsx";
 import { Page } from "../components/page.tsx";
@@ -14,7 +15,7 @@ export function categoryLoader({ params, request }: LoaderFunctionArgs) {
   const slug = CategorySlugSchema.safeParse(params.slug);
   const parsed = parseSearchParams(new URL(request.url).searchParams);
   if (!slug.success || parsed === null) throw new NotFoundError("찾을 수 없는 카테고리입니다");
-  return { slug: slug.data, result: callApi("searchProducts", { query: { category: slug.data, sort: parsed.query.sort } }) };
+  return { slug: slug.data, result: streamed(callApi("searchProducts", { query: { category: slug.data, sort: parsed.query.sort } })) };
 }
 
 export function CategoryPage() {

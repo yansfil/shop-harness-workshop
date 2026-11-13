@@ -1,5 +1,6 @@
 import { type OrderDetail, type OrderSummary, OrderParamsSchema, PAYMENT_METHOD_LABELS } from "@grabmarket/contracts";
 import { Link, type LoaderFunctionArgs, useLoaderData } from "react-router";
+import { streamed } from "../lib/streamed.ts";
 import { callApi } from "../api/client.ts";
 import { LinkButton } from "../components/button.tsx";
 import { Icon } from "../components/icon.tsx";
@@ -20,7 +21,7 @@ export function summarize(order: Pick<OrderSummary, "firstItemName" | "itemCount
 // ---- 내 주문 목록 ----
 
 export function myOrdersLoader() {
-  return { result: callApi("listMyOrders") };
+  return { result: streamed(callApi("listMyOrders")) };
 }
 
 export function MyOrdersPage() {
@@ -109,7 +110,7 @@ function OrderList({ orders }: { orders: OrderSummary[] }) {
 export function myOrderLoader({ params }: LoaderFunctionArgs) {
   const parsed = OrderParamsSchema.safeParse(params);
   if (!parsed.success) throw new NotFoundError("찾을 수 없는 주문입니다");
-  return { result: callApi("getMyOrder", { params: { orderId: parsed.data.orderId } }) };
+  return { result: streamed(callApi("getMyOrder", { params: { orderId: parsed.data.orderId } })) };
 }
 
 const orderNotFound = (
