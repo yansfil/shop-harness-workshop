@@ -1,9 +1,6 @@
 // 정산 조회 SQL
 import { all, getDb, isBlank, one, run, str } from "../../legacy/legacyUtils.ts";
 
-export type OrderSettlementRow = any;
-export type ItemSettlementRow = any;
-
 const ORDER_COLUMNS =
   "o.id, o.order_number, o.customer_id, o.status, o.subtotal, o.shipping_fee, o.total, o.created_at, " +
   "u.name AS customer_name, COALESCE(p.coupon_discount, 0) AS coupon_discount, COALESCE(p.point_used, 0) AS point_used, " +
@@ -11,56 +8,53 @@ const ORDER_COLUMNS =
 
 const ORDER_FROM = " FROM orders o JOIN users u ON u.id = o.customer_id LEFT JOIN order_payments p ON p.order_id = o.id";
 
-/** 기간(from 이상 to 미만, ISO)과 검색어(주문번호·고객 이름)로 정산 대상 주문 조건을 만든다 */
-export function settlementWhere(fromIso: string, toIso: string, keyword?: string): string {
+interface Where {
+  sql: string;
+  args: string[];
+}
+
+/** 기간(from 이상 to 미만, ISO)과 검색어(주문번호·고객 이름)로 정산 대상 주문 조건을 만든다. 값은 모두 바인딩한다 */
+export function settlementWhere(fromIso: string, toIso: string, keyword?: string): Where {
   let sql = " WHERE o.status <> 'cancelled'";
-  if (!isBlank(fromIso)) sql += " AND o.created_at >= '" + fromIso + "'";
-  if (!isBlank(toIso)) sql += " AND o.created_at < '" + toIso + "'";
+  const args: string[] = [];
+  if (!isBlank(fromIso)) {
+    sql += " AND o.created_at >= ?";
+    args.push(fromIso);
+  }
+  if (!isBlank(toIso)) {
+    sql += " AND o.created_at < ?";
+    args.push(toIso);
+  }
   if (!isBlank(keyword)) {
     const kw = str(keyword).trim();
-    sql += " AND (o.order_number = '" + kw + "' OR u.name = '" + kw + "')";
+    sql += " AND (o.order_number = ? OR u.name = ?)";
+    args.push(kw, kw);
   }
-  return sql;
+  return { sql: sql, args: args };
 }
 
-export function loadOrders(fromIso: string, toIso: string, keyword?: string): OrderSettlementRow[] {
-  const sql = "SELECT " + ORDER_COLUMNS + ORDER_FROM + settlementWhere(fromIso, toIso, keyword) + " ORDER BY o.created_at, o.id";
-  return getDb().prepare(sql).all();
+export function loadOrders(fromIso: string, toIso: string, keyword?: string): any[] {
+  const where = settlementWhere(fromIso, toIso, keyword);
+  const sql = "SELECT " + ORDER_COLUMNS + ORDER_FROM + where.sql + " ORDER BY o.created_at, o.id";
+  return getDb().prepare(sql).all(...where.args);
 }
 
-export function loadItems(orderIds: number[]): ItemSettlementRow[] {
-  if (orderIds.length === 0) return [];
-  const out: any[] = [];
-  for (let i = 0; i < orderIds.length; i += 500) {
-    const part = orderIds.slice(i, i + 500);
-    const rows = getDb()
-      .prepare("SELECT order_id, id, product_id, product_name, unit_price, quantity, line_total FROM order_items WHERE order_id IN (" + part.join(",") + ") ORDER BY order_id, id")
-      .all();
-    for (const r of rows) out.push(r);
-  }
-  return out;
-}
-
-/** 월별 합계. 쿠폰·포인트는 상품 줄 금액 비중대로 나눈 값을 그대로 더한다 */
-export function monthlyItemSums(fromIso: string, toIso: string, keyword?: string): any[] {
+/** 월별 합계. 쿠폰·포인트는 주문마다 정수 원이라 그대로 더한다 */
+export function monthlyOrderSums(fromIso: string, toIso: string, keyword?: string): any[] {
+  const where = settlementWhere(fromIso, toIso, keyword);
   const sql =
-    "SELECT substr(o.created_at, 1, 7) AS month, COUNT(DISTINCT o.id) AS order_count, SUM(i.line_total) AS goods, " +
-    "SUM(COALESCE(p.coupon_discount, 0) * (i.line_total * 1.0 / o.subtotal)) AS coupon, " +
-    "SUM(COALESCE(p.point_used, 0) * (i.line_total * 1.0 / o.subtotal)) AS point" +
+    "SELECT substr(o.created_at, 1, 7) AS month, COUNT(*) AS order_count, SUM(o.subtotal) AS goods, " +
+    "SUM(COALESCE(p.coupon_discount, 0)) AS coupon, SUM(COALESCE(p.point_used, 0)) AS point" +
     ORDER_FROM +
-    " JOIN order_items i ON i.order_id = o.id" +
-    settlementWhere(fromIso, toIso, keyword) +
+    where.sql +
     " GROUP BY substr(o.created_at, 1, 7) ORDER BY month DESC";
-  return getDb().prepare(sql).all();
+  return getDb().prepare(sql).all(...where.args);
 }
 
 export function monthlyShipping(fromIso: string, toIso: string, keyword?: string): any[] {
-  const sql =
-    "SELECT substr(o.created_at, 1, 7) AS month, SUM(o.shipping_fee) AS shipping" +
-    ORDER_FROM +
-    settlementWhere(fromIso, toIso, keyword) +
-    " GROUP BY substr(o.created_at, 1, 7)";
-  return getDb().prepare(sql).all();
+  const where = settlementWhere(fromIso, toIso, keyword);
+  const sql = "SELECT substr(o.created_at, 1, 7) AS month, SUM(o.shipping_fee) AS shipping" + ORDER_FROM + where.sql + " GROUP BY substr(o.created_at, 1, 7)";
+  return getDb().prepare(sql).all(...where.args);
 }
 
 export function firstOrderAt(): string | null {

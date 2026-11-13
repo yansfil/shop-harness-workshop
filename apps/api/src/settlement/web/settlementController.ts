@@ -1,15 +1,14 @@
 // 정산 API
 import type { Router } from "express";
-import { mustAdmin, mustLogin, ok, queryStr, sendCsv, wrap, fmtMd } from "../../legacy/legacyUtils.ts";
+import { mustAdmin, ok, queryStr, sendCsv, wrap, fmtMd } from "../../legacy/legacyUtils.ts";
 import * as settlementService from "../settlementService.ts";
-import { closedDays } from "../infra/settlementQueries.ts";
 
 export function registerSettlementRoutes(router: Router): void {
   // 일별 정산
   router.get(
     "/api/admin/settlements/daily",
     wrap((req, res) => {
-      mustLogin(res);
+      mustAdmin(res);
       ok(res, settlementService.daily(queryStr(req, "from"), queryStr(req, "to"), queryStr(req, "q")));
     }),
   );
@@ -18,7 +17,7 @@ export function registerSettlementRoutes(router: Router): void {
   router.get(
     "/api/admin/settlements/monthly",
     wrap((req, res) => {
-      mustLogin(res);
+      mustAdmin(res);
       ok(res, settlementService.monthly(queryStr(req, "q")));
     }),
   );
@@ -49,7 +48,7 @@ export function registerSettlementRoutes(router: Router): void {
     wrap((req, res) => {
       mustAdmin(res);
       const range = settlementService.defaultRange();
-      const rows = closedDays(queryStr(req, "from", range.from), queryStr(req, "to", range.to));
+      const rows = settlementService.closedDaysIn(queryStr(req, "from", range.from), queryStr(req, "to", range.to));
       ok(res, {
         days: rows.map((r: any) => ({
           day: r.day,

@@ -5,7 +5,6 @@ import {
   dayList,
   fmtMd,
   fmtMonthKo,
-  groupBy,
   isBlank,
   isValidDate,
   log,
@@ -53,13 +52,11 @@ export function daily(fromInput: any, toInput: any, keyword: any): any {
   const fromIso = startOfDay(range.from).toISOString();
   const toIso = addDays(startOfDay(range.to), 1).toISOString();
   const orders = queries.loadOrders(fromIso, toIso, trim(keyword));
-  const items = queries.loadItems(orders.map((o: any) => o.id));
-  const itemsByOrder = groupBy(items, "order_id");
   const byDay: any = {};
   for (const order of orders) {
     const day = String(order.created_at).slice(0, 10);
     if (!byDay[day]) byDay[day] = emptyRow(day);
-    const r = settleOrder(order, itemsByOrder[order.id] || []);
+    const r = settleOrder(order);
     const target = byDay[day];
     target.orderCount += r.orderCount;
     target.goods += r.goods;
@@ -92,7 +89,7 @@ export function monthly(keyword: any): any {
   if (!first || !last) return { period: "month", rows: [], total: toDto(emptyRow("total")), periodText: "", keyword: trim(keyword) };
   const fromIso = startOfMonth(first).toISOString();
   const toIso = startOfNextMonth(now() > toDate(last) ? now() : last).toISOString();
-  const sums = queries.monthlyItemSums(fromIso, toIso, trim(keyword));
+  const sums = queries.monthlyOrderSums(fromIso, toIso, trim(keyword));
   const shipping = queries.monthlyShipping(fromIso, toIso, trim(keyword));
   const shippingByMonth: any = {};
   for (const s of shipping) shippingByMonth[s.month] = Number(s.shipping || 0);
@@ -175,4 +172,19 @@ export function rangeForMonth(month: string): any {
   const start = startOfMonth(month + "-01");
   const end = addDays(startOfNextMonth(start), -1);
   return { from: ymd(start), to: ymd(end) };
+}
+
+/** 마감된 날 목록 (관리자 화면) */
+export function closedDaysIn(fromDay: string, toDay: string): any[] {
+  return queries.closedDays(fromDay, toDay);
+}
+
+/** 그날 정산 대상 주문 수 (취소 제외) */
+export function countOrdersOnDay(day: string): number {
+  return queries.countOrdersOnDay(day);
+}
+
+/** 마감 기록 한 줄 */
+export function findClosedDay(day: string): any {
+  return queries.findClosedDay(day);
 }

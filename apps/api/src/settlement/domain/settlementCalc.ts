@@ -1,6 +1,15 @@
 // 정산 계산
-// 주문의 쿠폰 할인·포인트 사용은 상품 줄 금액 비중대로 나눠 상품 줄마다 정산 금액을 낸다(카테고리별 정산과 같은 방식).
-import type { ItemSettlementRow, OrderSettlementRow } from "../infra/settlementQueries.ts";
+// 주문 한 건의 쿠폰 할인·포인트 사용은 이미 원 단위 정수다. 나누거나 반올림하지 않고 그대로 더한다.
+// 그래서 일별·월별·실제 결제 금액이 항상 같은 값이 나온다.
+
+/** 정산 대상 주문 한 줄(금액은 모두 정수 원) */
+export interface OrderSettlementRow {
+  id: number;
+  subtotal: number;
+  shipping_fee: number;
+  coupon_discount: number;
+  point_used: number;
+}
 
 export interface SettlementRow {
   key: string;
@@ -16,41 +25,14 @@ export function emptyRow(key: string): SettlementRow {
   return { key: key, orderCount: 0, goods: 0, shipping: 0, coupon: 0, point: 0, net: 0 };
 }
 
-/** 주문 한 건을 상품 줄로 나눈다 */
-export function splitOrder(order: OrderSettlementRow, items: ItemSettlementRow[]): any[] {
-  const subtotal = order.subtotal || 0;
-  return items.map((item: any) => {
-    const ratio = subtotal > 0 ? item.line_total / subtotal : 0;
-    const coupon = order.coupon_discount * ratio;
-    const point = order.point_used * ratio;
-    return {
-      orderId: order.id,
-      itemId: item.id,
-      goods: item.line_total,
-      coupon: coupon,
-      point: point,
-      net: item.line_total - coupon - point,
-    };
-  });
-}
-
-/** 상품 줄 하나를 원 단위로 */
-export function roundLine(line: any): any {
-  const coupon = Math.round(line.coupon);
-  const point = Math.round(line.point);
-  return { ...line, coupon: coupon, point: point, net: line.goods - coupon - point };
-}
-
-/** 주문 한 건의 정산 (상품 줄을 원 단위로 맞춘 뒤 더한다) */
-export function settleOrder(order: OrderSettlementRow, items: ItemSettlementRow[]): SettlementRow {
+/** 주문 한 건의 정산 */
+export function settleOrder(order: OrderSettlementRow): SettlementRow {
   const row = emptyRow(String(order.id));
   row.orderCount = 1;
-  row.shipping = order.shipping_fee || 0;
-  for (const line of splitOrder(order, items).map(roundLine)) {
-    row.goods += line.goods;
-    row.coupon += line.coupon;
-    row.point += line.point;
-  }
+  row.goods = order.subtotal;
+  row.shipping = order.shipping_fee;
+  row.coupon = order.coupon_discount;
+  row.point = order.point_used;
   row.net = row.goods + row.shipping - row.coupon - row.point;
   return row;
 }
@@ -71,11 +53,11 @@ export function totalOf(rows: SettlementRow[], key?: string): SettlementRow {
   return total;
 }
 
-/** 월별 합계 행: SQL이 더한 값을 원 단위로 */
+/** 월별 합계 행: SQL이 더한 정수 합계 */
 export function monthRow(month: string, sums: any, shipping: number): SettlementRow {
   const goods = Number(sums.goods || 0);
-  const coupon = Math.round(Number(sums.coupon || 0));
-  const point = Math.round(Number(sums.point || 0));
+  const coupon = Number(sums.coupon || 0);
+  const point = Number(sums.point || 0);
   return {
     key: month,
     orderCount: Number(sums.order_count || 0),

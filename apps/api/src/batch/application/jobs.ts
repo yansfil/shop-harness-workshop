@@ -1,7 +1,6 @@
 // 배치 작업 내용
 import { addDays, comma, emit, fmtDot, fmtMd, now, nowIso, startOfDay, ym, ymd } from "../../legacy/legacyUtils.ts";
-import { closeDay, unclosedDays } from "../../settlement/settlementService.ts";
-import { countOrdersOnDay, findClosedDay } from "../../settlement/infra/settlementQueries.ts";
+import { closeDay, countOrdersOnDay, findClosedDay, unclosedDays } from "../../settlement/settlementService.ts";
 import { expireOld } from "../../points/pointManager.ts";
 import { syncDelivered } from "../../delivery/deliveryManager.ts";
 import { delays } from "../../delivery/deliveryOps.ts";
