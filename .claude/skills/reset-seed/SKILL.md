@@ -1,7 +1,6 @@
 ---
 name: reset-seed
 description: 그랩마켓 DB를 지우고 시드로 다시 채운다(npm run db:reset). 사용자가 DB 초기화·시드 재생성을 요청할 때만 쓰고, 사용자의 확인을 받은 뒤에만 실행한다.
-allowed-tools: Bash(npm run db:reset)
 ---
 
 # DB 초기화

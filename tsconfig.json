@@ -6,7 +6,6 @@
     "apps/api/scripts/**/*.ts",
     "tools/*/src/**/*.ts",
     "tests/**/*.ts",
-    ".claude/skills/*/*.ts",
     "vitest.config.ts",
     "apps/web/vite.config.ts"
   ]
