@@ -23,6 +23,11 @@ export function addMoney(a: Money, b: Money): Money {
   return won(a + b);
 }
 
+/** a - b. b가 a보다 크면 음수라서 won()이 던진다. 먼저 크기를 비교한 뒤 부른다. */
+export function subtractMoney(a: Money, b: Money): Money {
+  return won(a - b);
+}
+
 /** 단가 × 수량. 수량은 0 이상의 정수다. */
 export function multiplyMoney(unitPrice: Money, quantity: number): Money {
   if (!Number.isSafeInteger(quantity) || quantity < 0) {

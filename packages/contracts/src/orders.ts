@@ -61,6 +61,8 @@ export const OrderQuoteResponseSchema = z.object({
   shippingFee: MoneySchema,
   /** 결제 금액 = subtotal + shippingFee */
   total: MoneySchema,
+  /** 무료배송까지 더 담아야 하는 금액. 이미 무료배송이면 0. 서버가 계산하고 화면은 그대로 보인다. */
+  freeShippingRemaining: MoneySchema,
   shortages: z.array(StockShortageSchema),
 });
 export type OrderQuoteResponse = z.infer<typeof OrderQuoteResponseSchema>;

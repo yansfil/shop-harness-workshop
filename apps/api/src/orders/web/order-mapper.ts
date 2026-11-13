@@ -42,6 +42,7 @@ export function toQuoteDto(quote: Quote): OrderQuoteResponse {
     subtotal: quote.subtotal,
     shippingFee: quote.shippingFee,
     total: quote.total,
+    freeShippingRemaining: quote.freeShippingRemaining,
     shortages: quote.shortages,
   };
 }

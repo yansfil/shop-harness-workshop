@@ -1,4 +1,4 @@
-import type { Clock } from "@grabmarket/shared";
+import type { Clock, Money } from "@grabmarket/shared";
 import type { CatalogService } from "../../catalog/application/catalog-service.ts";
 import type { InventoryService } from "../../inventory/application/inventory-service.ts";
 import { InsufficientStockError, type StockLine, type StockShortage } from "../../inventory/domain/stock.ts";
@@ -16,8 +16,11 @@ import {
   priceOrder,
   type PricedOrder,
 } from "../domain/order.ts";
+import { remainingForFreeShipping } from "../domain/shipping-fee.ts";
 
 export interface Quote extends PricedOrder {
+  /** 무료배송까지 더 담아야 하는 금액. 이미 무료배송이면 0 */
+  freeShippingRemaining: Money;
   shortages: StockShortage[];
 }
 
@@ -45,7 +48,7 @@ export class OrderService {
   /** 장바구니 금액 미리 보기. 재고가 모자라도 오류가 아니라 shortages로 알린다. */
   quote(lines: CartLine[]): Quote {
     const priced = this.#price(lines);
-    return { ...priced, shortages: this.#inventory.findShortages(stockLines(priced)) };
+    return { ...priced, freeShippingRemaining: remainingForFreeShipping(priced.subtotal), shortages: this.#inventory.findShortages(stockLines(priced)) };
   }
 
   /**

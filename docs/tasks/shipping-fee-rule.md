@@ -6,14 +6,15 @@
 
 ## 현재 규칙
 
-상품 합계가 30,000원 이상이면 배송비 0원, 미만이면 3,000원이다.
+상품 합계가 50,000원 이상이면 배송비 0원, 미만이면 3,000원이다.
 결제 금액은 상품 합계 + 배송비다.
+기준을 30,000원에서 50,000원으로 올린 변경은 `docs/tasks/free-shipping-threshold.md`에 있다.
 
 규칙은 `apps/api/src/orders/domain/shipping-fee.ts` 한 곳이다.
 
 ```ts
 export const SHIPPING_FEE = won(3_000);
-export const FREE_SHIPPING_THRESHOLD = won(30_000);
+export const FREE_SHIPPING_THRESHOLD = won(50_000);
 export function calculateShippingFee(subtotal: Money): Money { ... }
 ```
 
@@ -25,7 +26,7 @@ export function calculateShippingFee(subtotal: Money): Money { ... }
 | `apps/api/src/orders/web/order-mapper.ts` | 배송비를 응답 DTO에 옮긴다 |
 | `packages/contracts/src/orders.ts` | 견적·주문 응답의 `shippingFee` 필드와 "배송비 규칙은 서버 한 곳" 주석 |
 | `packages/db/migrations/0001_init.sql`의 `orders.shipping_fee` | 주문 시점의 배송비를 주문에 저장한다. 이미 만든 주문은 규칙이 바뀌어도 저장된 값이 그대로다 |
-| `apps/web/src/lib/use-quote.ts`, `components/summary-box.tsx` | 화면은 견적 응답의 값을 그대로 보인다. 장바구니·주문서·상품 상세가 같은 조각을 쓴다 |
+| `apps/web/src/lib/use-quote.ts`, `components/summary-box.tsx` | 화면은 견적 응답의 값(남은 금액 `freeShippingRemaining` 포함)을 그대로 보인다. 장바구니·주문서가 같은 조각을 쓰고, 상품 상세는 배송비 값만 보인다 |
 | `apps/web/src/routes/orders-pages.tsx`, `admin-orders-pages.tsx` | 주문 상세에서 저장된 배송비를 보인다 |
 | `apps/api/src/seed/seed-database.ts`, `order-simulator.ts` | 시드 주문과 시뮬레이터 주문도 같은 주문 서비스를 거치므로 규칙이 바뀌면 `npm run db:reset`으로 만든 주문 금액이 달라진다 |
 

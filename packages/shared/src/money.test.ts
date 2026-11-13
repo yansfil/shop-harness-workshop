@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatWon, multiplyMoney, sumMoney, won } from "./money.ts";
+import { formatWon, InvalidMoneyError, multiplyMoney, subtractMoney, sumMoney, won } from "./money.ts";
 
 describe("Money", () => {
   it("단가 × 수량과 합계를 정수 원으로 계산한다", () => {
@@ -14,5 +14,10 @@ describe("Money", () => {
 
   it("화면 표기는 천 단위 쉼표와 원을 붙인다", () => {
     expect(formatWon(won(1234500))).toBe("1,234,500원");
+  });
+
+  it("빼기는 정수 원으로 계산하고 음수가 되면 거절한다", () => {
+    expect(subtractMoney(won(50_000), won(47_800))).toBe(2_200);
+    expect(() => subtractMoney(won(1_000), won(1_001))).toThrow(InvalidMoneyError);
   });
 });
