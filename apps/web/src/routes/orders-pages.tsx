@@ -1,8 +1,9 @@
 import { type OrderDetail, type OrderSummary, OrderParamsSchema, PAYMENT_METHOD_LABELS } from "@grabmarket/contracts";
+import { useEffect, useState } from "react";
 import { Link, type LoaderFunctionArgs, useLoaderData } from "react-router";
 import { streamed } from "../lib/streamed.ts";
-import { callApi } from "../api/client.ts";
-import { LinkButton } from "../components/button.tsx";
+import { callApi, isApiError } from "../api/client.ts";
+import { Button, LinkButton } from "../components/button.tsx";
 import { Icon } from "../components/icon.tsx";
 import { Loaded } from "../components/loaded.tsx";
 import { OrderLines } from "../components/order-lines.tsx";
@@ -149,50 +150,149 @@ export function MyOrderPage() {
   return (
     <Page>
       <Loaded resolve={result} failure="주문을 불러오지 못했어요" skeleton={detailSkeleton} notFound={orderNotFound}>
-        {({ order }) => (
-          <>
-            <Link to="/orders" className="inline-flex items-center gap-1 text-xs-plus font-semibold text-ink-2">
-              <Icon name="chevronLeft" className="size-4" />내 주문
-            </Link>
-            <h1 className="mt-3 flex flex-wrap items-center gap-3 text-xl leading-8 font-extrabold text-ink md:text-2xl">
-              주문 {order.orderNumber}
-              <StatusBadge status={order.status} />
-              <span className="text-sm leading-5 font-medium text-ink-3">{formatShortTime(order.createdAt)} 주문</span>
-            </h1>
-            <div className="mt-4 rounded-md border border-line bg-ground px-4 py-5 md:px-6 md:py-6">
-              <div className="mx-auto max-w-190">
-                <OrderSteps status={order.status} />
-              </div>
-            </div>
-            <div className="mt-3 flex flex-col gap-3 lg:grid lg:grid-cols-[minmax(0,1fr)_22.5rem] lg:items-start lg:gap-3">
-              <section aria-labelledby="order-items" className="rounded-md border border-line bg-ground">
-                <h2 id="order-items" className="flex h-12 items-center border-b border-line px-4 text-base font-extrabold text-ink md:px-6">
-                  주문 상품
-                </h2>
-                <OrderLines items={order.items} />
-              </section>
-              <aside aria-label="결제 정보" className="rounded-md border border-line bg-ground p-6">
-                <dl className="flex flex-col gap-3 text-sm">
-                  <div className="flex justify-between">
-                    <dt className="text-ink-3">상품 합계</dt>
-                    <dd className="font-semibold text-ink">{krw(order.subtotal)}</dd>
-                  </div>
-                  <div className="flex justify-between">
-                    <dt className="text-ink-3">배송비</dt>
-                    <dd className="font-semibold text-ink">{krw(order.shippingFee)}</dd>
-                  </div>
-                  <div className="mb-3 flex items-center justify-between border-t border-line pt-4">
-                    <dt className="font-bold text-ink">결제 금액</dt>
-                    <dd className="text-2xl leading-9 font-extrabold text-ink">{krw(order.total)}</dd>
-                  </div>
-                </dl>
-                <MethodRows order={order} />
-              </aside>
-            </div>
-          </>
-        )}
+        {({ order }) => <MyOrderView initial={order} />}
       </Loaded>
     </Page>
+  );
+}
+
+function MyOrderView({ initial }: { initial: OrderDetail }) {
+  const [order, setOrder] = useState(initial);
+  const [confirming, setConfirming] = useState(false);
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [cancelledNow, setCancelledNow] = useState(false);
+
+  async function cancel() {
+    setPending(true);
+    setError(null);
+    try {
+      const response = await callApi("cancelMyOrder", { params: { orderId: order.id } });
+      setOrder(response.order);
+      setCancelledNow(true);
+    } catch (caught) {
+      if (!isApiError(caught)) throw caught;
+      setError(caught.message);
+      // 그 사이 주문 상태가 바뀌었을 수 있으니 서버의 주문을 다시 읽어 보인다.
+      if (caught.code === "ORDER_NOT_CANCELLABLE") {
+        await callApi("getMyOrder", { params: { orderId: order.id } }).then(
+          (fresh) => {
+            setOrder(fresh.order);
+          },
+          () => undefined,
+        );
+      }
+    } finally {
+      setPending(false);
+      setConfirming(false);
+    }
+  }
+
+  return (
+    <>
+      <Link to="/orders" className="inline-flex items-center gap-1 text-xs-plus font-semibold text-ink-2">
+        <Icon name="chevronLeft" className="size-4" />내 주문
+      </Link>
+      <h1 className="mt-3 flex flex-wrap items-center gap-3 text-xl leading-8 font-extrabold text-ink md:text-2xl">
+        주문 {order.orderNumber}
+        <StatusBadge status={order.status} />
+        <span className="text-sm leading-5 font-medium text-ink-3">{formatShortTime(order.createdAt)} 주문</span>
+      </h1>
+      <div className="mt-4 rounded-md border border-line bg-ground px-4 py-5 md:px-6 md:py-6">
+        <div className="mx-auto max-w-190">
+          <OrderSteps status={order.status} />
+        </div>
+      </div>
+      <div className="mt-3 flex flex-col gap-3 lg:grid lg:grid-cols-[minmax(0,1fr)_22.5rem] lg:items-start lg:gap-3">
+        <section aria-labelledby="order-items" className="rounded-md border border-line bg-ground">
+          <h2 id="order-items" className="flex h-12 items-center border-b border-line px-4 text-base font-extrabold text-ink md:px-6">
+            주문 상품
+          </h2>
+          <OrderLines items={order.items} />
+        </section>
+        <aside aria-label="결제 정보" className="rounded-md border border-line bg-ground p-6">
+          <dl className="flex flex-col gap-3 text-sm">
+            <div className="flex justify-between">
+              <dt className="text-ink-3">상품 합계</dt>
+              <dd className="font-semibold text-ink">{krw(order.subtotal)}</dd>
+            </div>
+            <div className="flex justify-between">
+              <dt className="text-ink-3">배송비</dt>
+              <dd className="font-semibold text-ink">{krw(order.shippingFee)}</dd>
+            </div>
+            <div className="mb-3 flex items-center justify-between border-t border-line pt-4">
+              <dt className="font-bold text-ink">결제 금액</dt>
+              <dd className="text-2xl leading-9 font-extrabold text-ink">{krw(order.total)}</dd>
+            </div>
+          </dl>
+          <MethodRows order={order} />
+          {order.cancellable && (
+            <Button
+              variant="secondary"
+              size="lg"
+              className="mt-6 w-full"
+              onClick={() => {
+                setConfirming(true);
+              }}
+            >
+              주문 취소
+            </Button>
+          )}
+          {cancelledNow && (
+            <p role="status" className="mt-4 rounded-sm bg-soldout-bg px-3 py-2 text-xs-plus font-semibold text-soldout-text">
+              주문을 취소했어요. 교육용 가상 결제라 실제 환불은 없어요.
+            </p>
+          )}
+          {error !== null && (
+            <p role="alert" className="mt-4 rounded-sm bg-danger-soft px-3 py-2 text-xs-plus font-semibold text-danger">
+              {error}
+            </p>
+          )}
+        </aside>
+      </div>
+      {confirming && (
+        <CancelConfirm
+          pending={pending}
+          onClose={() => {
+            setConfirming(false);
+          }}
+          onConfirm={() => void cancel()}
+        />
+      )}
+    </>
+  );
+}
+
+/** 취소는 되돌릴 수 없으므로 한 번 더 묻는다. */
+function CancelConfirm({ pending, onClose, onConfirm }: { pending: boolean; onClose: () => void; onConfirm: () => void }) {
+  useEffect(() => {
+    const close = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", close);
+    return () => {
+      document.removeEventListener("keydown", close);
+    };
+  }, [onClose]);
+
+  return (
+    <div role="dialog" aria-modal="true" aria-labelledby="cancel-title" className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div aria-hidden="true" onClick={onClose} className="absolute inset-0 bg-scrim" />
+      <div className="relative w-full max-w-100 rounded-md bg-ground p-6">
+        <h2 id="cancel-title" className="text-lg font-extrabold text-ink">
+          주문을 취소할까요?
+        </h2>
+        <p className="mt-2 text-sm text-ink-2">취소하면 되돌릴 수 없어요. 주문한 상품은 재고로 돌아가요.</p>
+        <div className="mt-6 flex gap-2">
+          <Button variant="secondary" size="lg" className="flex-1" autoFocus disabled={pending} onClick={onClose}>
+            돌아가기
+          </Button>
+          <Button size="lg" className="flex-1" disabled={pending} onClick={onConfirm}>
+            {pending ? "취소하는 중" : "주문 취소하기"}
+          </Button>
+        </div>
+      </div>
+    </div>
   );
 }
 

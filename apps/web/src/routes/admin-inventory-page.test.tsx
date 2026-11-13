@@ -100,4 +100,19 @@ describe("관리자 재고 화면의 안전재고 알림", () => {
     expect(screen.getByRole("row", { name: /제주 감귤/ })).toBeInTheDocument();
     expect(screen.getByRole("row", { name: /충전기/ })).toBeInTheDocument();
   });
+
+  it("입출고 이력에 취소 복구 줄이 주문 번호와 함께 늘어난 수량으로 보인다", async () => {
+    openInventory(SAMPLE);
+    api.on("GET /api/admin/inventory/2/movements", () => ({
+      json: {
+        item: SAMPLE[1],
+        movements: [{ id: 2, kind: "restock", quantityDelta: 2, quantityAfter: 3, orderNumber: "GM-20261114-0007", memo: null, createdByName: null, createdAt: "2026-11-14T03:05:00.000Z" }],
+      },
+    }));
+    await userEvent.click(await screen.findByRole("button", { name: "충전기" }));
+
+    const history = await screen.findByRole("complementary", { name: "입출고 이력" });
+    expect(await within(history).findByText(/취소 복구 · 주문 GM-20261114-0007/)).toBeInTheDocument();
+    expect(within(history).getByText("+2")).toBeInTheDocument();
+  });
 });
