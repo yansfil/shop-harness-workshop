@@ -56,6 +56,13 @@ describe("규칙 1 계층 import 방향", () => {
     expect(found(gradeSinceStart(root))).toEqual([`layer-import ${CONTROLLER}:2`]);
   });
 
+  it("여러 줄 import에서 경로 줄만 infra로 바꿔도 import 문 첫 줄에 위반", () => {
+    const multiline = (layer: string): string => `import {\n  Repository,\n} from "../${layer}/repository.ts";\nexport {};\n`;
+    const root = repoAtStart({ [CONTROLLER]: multiline("application") });
+    write(root, { [CONTROLLER]: multiline("infra") });
+    expect(found(gradeSinceStart(root))).toEqual([`layer-import ${CONTROLLER}:1`]);
+  });
+
   it("domain이 @grabmarket/db를 가져오면 위반", () => {
     const root = repoAtStart({ "README.md": "x\n" });
     write(root, { "apps/api/src/orders/domain/order.ts": 'import { openDatabase } from "@grabmarket/db";\nexport {};\n' });
@@ -107,13 +114,38 @@ describe("규칙 3 전이 함수 밖 status 대입", () => {
     expect(found(gradeSinceStart(root))).toEqual([`status-assignment ${SERVICE}:2`, `status-assignment ${SERVICE}:3`]);
   });
 
-  it("도메인 전이 함수 안의 대입과 infra repository의 저장 SQL은 통과", () => {
+  it("도메인 전이 함수(transitionStatus) 안의 대입과 infra repository의 저장 SQL은 통과", () => {
     const root = repoAtStart({ "README.md": "x\n" });
     write(root, {
-      "apps/api/src/orders/domain/order-status.ts": "export function apply(order: { status: string }, next: string) {\n  order.status = next;\n}\n",
+      "apps/api/src/orders/domain/order-status.ts": "export function transitionStatus(order: { status: string }, next: string) {\n  order.status = next;\n}\n",
       "apps/api/src/orders/infra/order-repository.ts": 'export const SAVE = "UPDATE orders SET status = ?, updated_at = ? WHERE id = ?";\n',
     });
     expect(found(gradeSinceStart(root))).toEqual([]);
+  });
+
+  it("주문 엔터티의 this.status 대입은 위반(클래스 필드의 첫 값은 대입이 아니다)", () => {
+    const file = "apps/api/src/orders/application/a.ts";
+    const root = repoAtStart({ "README.md": "x\n" });
+    write(root, { [file]: 'export class Order {\n  status = "paid";\n  ship() {\n    this.status = "shipping";\n  }\n}\n' });
+    expect(found(gradeSinceStart(root))).toEqual([`status-assignment ${file}:4`]);
+  });
+
+  it("orders/domain 안이라도 전이 함수 밖의 대입은 위반", () => {
+    const file = "apps/api/src/orders/domain/bypass.ts";
+    const root = repoAtStart({ "README.md": "x\n" });
+    write(root, { [file]: 'export function bypass(order: { status: string }) {\n  order.status = "delivered";\n}\n' });
+    expect(found(gradeSinceStart(root))).toEqual([`status-assignment ${file}:2`]);
+  });
+
+  it("다른 모듈에서 주문 상태 값을 대입하면 위반, 주문과 무관한 status(health 등)는 대상 아님", () => {
+    const auth = "apps/api/src/auth/application/a.ts";
+    const report = "apps/api/src/reports/application/b.ts";
+    const root = repoAtStart({ "README.md": "x\n" });
+    write(root, {
+      [auth]: 'const health = { status: "ok" };\nhealth.status = "down";\nexport { health };\n',
+      [report]: 'export function mark(row: { status: string }) {\n  row.status = "delivered";\n}\n',
+    });
+    expect(found(gradeSinceStart(root))).toEqual([`status-assignment ${report}:2`]);
   });
 });
 
@@ -124,13 +156,40 @@ describe("규칙 7 기존 테스트 expect 변경", () => {
   it("기존 기대값을 바꾸면(여러 줄 expect 안쪽 포함) 위반", () => {
     const root = repoAtStart({ [TEST]: ORIGINAL });
     write(root, { [TEST]: ORIGINAL.replace("15900", "12900").replace('"paid"', '"shipping"') });
-    expect(found(gradeSinceStart(root))).toEqual([`test-expect-change ${TEST}:2`, `test-expect-change ${TEST}:4`]);
+    expect(found(gradeSinceStart(root))).toEqual([`test-expect-change ${TEST}:2`, `test-expect-change ${TEST}:3`]);
   });
 
   it("기존 expect는 그대로 두고 새 테스트를 더하면 통과", () => {
     const root = repoAtStart({ [TEST]: ORIGINAL });
     write(root, { [TEST]: `${ORIGINAL}it("new", () => {\n  expect(1).toBe(1);\n});\n` });
     expect(found(gradeSinceStart(root))).toEqual([]);
+  });
+
+  it("기존 여러 줄 expect 안에 원소를 추가만 해도 위반", () => {
+    const original = ['it("tables", () => {', "  expect(tables).toEqual([", '    "orders",', "  ]);", "});", ""].join("\n");
+    const root = repoAtStart({ [TEST]: original });
+    write(root, { [TEST]: original.replace('    "orders",', '    "orders",\n    "unexpected_table",') });
+    expect(found(gradeSinceStart(root))).toEqual([`test-expect-change ${TEST}:2`]);
+  });
+
+  it("기존 expect 사슬에 .not을 끼우면 위반", () => {
+    const root = repoAtStart({ [TEST]: ORIGINAL });
+    write(root, { [TEST]: ORIGINAL.replace("expect(order).toEqual", "expect(order)\n    .not.toEqual") });
+    expect(found(gradeSinceStart(root))).toEqual([`test-expect-change ${TEST}:3`]);
+  });
+
+  it("기존 expect와 모양이 같은 새 expect를 바로 뒤에 더해도(diff가 어긋나도) 통과", () => {
+    const original = ["it(\"a\", () => {", "  expect(a).toEqual([", "    1,", "  ]);", "});", ""].join("\n");
+    const root = repoAtStart({ [TEST]: original });
+    write(root, { [TEST]: original.replace("  ]);\n", "  ]);\n  expect(b).toEqual([\n    1,\n  ]);\n") });
+    expect(found(gradeSinceStart(root))).toEqual([]);
+  });
+
+  it("Supertest 체인의 .expect(상태 코드)를 바꾸면 위반", () => {
+    const original = ['it("create", async () => {', '  const response = await request(app).post("/api/orders").send(body).expect(201);', "  await request(app).get(\"/api/orders\").expect(200);", "  return response;", "});", ""].join("\n");
+    const root = repoAtStart({ [TEST]: original });
+    write(root, { [TEST]: original.replace(".expect(201)", ".expect(200)").replace(".expect(200);\n  return", ".expect(404);\n  return") });
+    expect(found(gradeSinceStart(root))).toEqual([`test-expect-change ${TEST}:2`, `test-expect-change ${TEST}:3`]);
   });
 
   it("기존 테스트 파일을 지우면 위반", () => {

@@ -36,7 +36,10 @@ function print(result: GradeResult): void {
       console.log(`  [${title}] ${violation.file}:${violation.line}  ${violation.message}`);
     }
   }
-  console.log(result.violations.length === 0 ? "\n통과: 규칙 6개를 모두 지켰어요" : `\n위반 ${result.violations.length}개`);
+  const checked = result.rules.filter((rule) => rule.count !== null).length;
+  const skipped = result.rules.length - checked;
+  const pass = skipped === 0 ? `규칙 ${checked}개를 모두 지켰어요` : `검사한 규칙 ${checked}개를 모두 지켰어요 (${skipped}개는 시작 태그와 비교해야 해서 해당 없음)`;
+  console.log(result.violations.length === 0 ? `\n통과: ${pass}` : `\n위반 ${result.violations.length}개`);
 }
 
 try {

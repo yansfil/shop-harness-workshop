@@ -31,6 +31,28 @@ export interface FileChange {
   /** 새로 생기거나 바뀐 줄(지금 파일 기준). null이면 파일 전체가 새것이다. */
   addedLines: Set<number> | null;
   removedLines: RemovedLine[];
+  /** diff 구간. 시작 태그 때 줄 번호를 지금 줄 번호로 옮길 때 쓴다. */
+  hunks: Hunk[];
+}
+
+export interface Hunk {
+  /** 구간의 첫 옛 줄(길이가 0이면 구간 바로 뒤 줄). */
+  oldStart: number;
+  oldCount: number;
+  /** 구간의 첫 새 줄(길이가 0이면 구간 바로 뒤 줄). */
+  newStart: number;
+  newCount: number;
+}
+
+/** 시작 태그 때 줄이 지금 몇째 줄인지. 바뀐 구간 안의 줄은 구간 안의 같은 순서 줄(새 구간이 더 짧으면 그 마지막 줄)로 옮긴다. */
+export function newLineOf(change: FileChange, oldLine: number): number {
+  let shift = 0;
+  for (const hunk of change.hunks) {
+    if (oldLine < hunk.oldStart) break;
+    if (oldLine < hunk.oldStart + hunk.oldCount) return hunk.newStart + Math.max(0, Math.min(oldLine - hunk.oldStart, hunk.newCount - 1));
+    shift += hunk.newCount - hunk.oldCount;
+  }
+  return oldLine + shift;
 }
 
 /** 현재 브랜치 이름과 그 시작 태그. 없으면 그 사실을 말하는 GradeError. */
@@ -59,7 +81,7 @@ export function parseUnifiedDiff(diff: string): FileChange[] {
   let newCursor = 0;
   for (const line of diff.split("\n")) {
     if (line.startsWith("diff --git ")) {
-      current = { oldPath: null, newPath: null, addedLines: new Set(), removedLines: [] };
+      current = { oldPath: null, newPath: null, addedLines: new Set(), removedLines: [], hunks: [] };
       changes.push(current);
       continue;
     }
@@ -76,6 +98,7 @@ export function parseUnifiedDiff(diff: string): FileChange[] {
       // 길이가 0인 구간의 시작 번호는 "그 줄 뒤"를 뜻한다.
       if (match[2] === "0") oldCursor += 1;
       if (match[4] === "0") newCursor += 1;
+      current.hunks.push({ oldStart: oldCursor, oldCount: Number(match[2] ?? 1), newStart: newCursor, newCount: Number(match[4] ?? 1) });
     } else if (line.startsWith("+")) {
       current.addedLines?.add(newCursor);
       newCursor += 1;
@@ -92,7 +115,7 @@ export function changesSince(root: string, tag: string): FileChange[] {
   const diff = git(root, ["diff", "--no-color", "--no-ext-diff", "--no-renames", "--unified=0", tag, "--"]);
   const changes = parseUnifiedDiff(diff);
   const untracked = git(root, ["ls-files", "--others", "--exclude-standard", "-z"]).split("\0").filter((file) => file !== "");
-  for (const file of untracked) changes.push({ oldPath: null, newPath: file, addedLines: null, removedLines: [] });
+  for (const file of untracked) changes.push({ oldPath: null, newPath: file, addedLines: null, removedLines: [], hunks: [] });
   return changes;
 }
 

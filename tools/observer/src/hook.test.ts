@@ -38,4 +38,12 @@ describe("InstructionsLoaded Hook", () => {
     expect(result.stderr).toContain("CLAUDE_CONFIG_DIR");
     expect(existsSync(path.join(home, ".claude"))).toBe(false);
   });
+
+  it("CLAUDE_CONFIG_DIR 없이 기록 폴더를 따로 넘겨도 쓰지 않고 실패한다", () => {
+    const home = mkdtempSync(path.join(os.tmpdir(), "hook-home-"));
+    dirs.push(home);
+    const result = runHook(EVENT, { HOME: home, OBSERVER_LOG_DIR: path.join(home, ".claude") });
+    expect(result.status).toBe(1);
+    expect(existsSync(path.join(home, ".claude"))).toBe(false);
+  });
 });

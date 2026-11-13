@@ -61,6 +61,23 @@ const UNREADABLE = {
 
 type Json = Record<string, unknown>;
 
+/**
+ * Claude Code 2.1.323이 세션 기록에 쓰는 줄 종류(본체의 기록 종류 표에서 옮겼다).
+ * 이 뷰어는 assistant(요청·도구 호출)와 user(도구 결과)만 쓰고 나머지는 읽고 넘긴다.
+ * 표에 없는 종류는 새 버전의 형식일 수 있으므로 읽지 못한 줄로 드러낸다.
+ */
+const KNOWN_TYPES: ReadonlySet<string> = new Set(
+  [
+    "user assistant system attachment progress",
+    "queue-operation api-request api-request-shape api-request-blob frame-link observer-ref continued-in resume-head-vouch",
+    "file-history-snapshot file-history-delta attribution-snapshot",
+    "custom-title ai-title tag relocated agent-name agent-color agent-setting mode repl-mode permission-mode",
+    "session-owner isolation-latch dev-mods atis-latch worktree-state bridge-session tools-used",
+    "data-flow-records data-flow-incomplete derived-from summary pr-link history-suppression ended-by-model",
+    "cost-state last-prompt content-replacement memory-mode artifact-comment-monitor artifact-autoreact-ledger fork-context-ref",
+  ].flatMap((group) => group.split(" ")),
+);
+
 function isObject(value: unknown): value is Json {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -124,6 +141,10 @@ export class TranscriptBuilder {
       this.#markUnreadable(line, UNREADABLE.shape);
       return;
     }
+    if (!KNOWN_TYPES.has(record.type)) {
+      this.#markUnreadable(line, `알 수 없는 줄 종류예요(${record.type})`);
+      return;
+    }
     this.#addRecord(record, record.type, line);
   }
 
@@ -159,7 +180,7 @@ export class TranscriptBuilder {
     // 서브에이전트 대화는 따로 센다(이 화면은 본 대화의 요청만 보인다).
     if (record.isSidechain === true) return;
     if (type === "assistant") this.#addAssistant(record, timestamp, line);
-    else if (type === "user") this.#addUser(record, timestamp);
+    else if (type === "user") this.#addUser(record, timestamp, line);
   }
 
   #addAssistant(record: Json, timestamp: string | null, line: number): void {
@@ -201,9 +222,14 @@ export class TranscriptBuilder {
     }
   }
 
-  #addUser(record: Json, timestamp: string | null): void {
+  #addUser(record: Json, timestamp: string | null, line: number): void {
     const message = record.message;
-    if (!isObject(message) || !Array.isArray(message.content) || timestamp === null) return;
+    // 사람이 쓴 프롬프트는 content가 글자, 도구 결과는 블록 배열이다. 그 밖의 모양은 새 형식일 수 있다.
+    if (!isObject(message) || timestamp === null || !(typeof message.content === "string" || Array.isArray(message.content))) {
+      this.#markUnreadable(line, UNREADABLE.shape);
+      return;
+    }
+    if (typeof message.content === "string") return;
     for (const block of message.content) {
       if (!isObject(block) || block.type !== "tool_result" || typeof block.tool_use_id !== "string") continue;
       const tool = this.#toolById.get(block.tool_use_id);

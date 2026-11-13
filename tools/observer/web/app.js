@@ -391,7 +391,7 @@ function gradeTab() {
     result.mode === "all"
       ? `<div class="heading"><span class="grade-big${total === 0 ? " pass" : ""} num">${total}개</span><strong>레포 전체 위반</strong><span>· 파일 ${result.filesChecked}개 검사</span>
           <button type="button" class="link end" data-regrade>다시 채점</button>${gradeToggle()}</div>`
-      : `<div class="heading"><strong>위반 ${total}개</strong><span>${total > 0 ? `· 규칙 6개 중 ${brokenRules}개에서 ` : ""}· ${escapeHtml(result.tag)} 이후 바뀐 파일 ${result.filesChecked}개</span>
+      : `<div class="heading"><strong>위반 ${total}개</strong><span>${total > 0 ? `· 규칙 ${result.rules.length}개 중 ${brokenRules}개에서 ` : ""}· ${escapeHtml(result.tag)} 이후 바뀐 파일 ${result.filesChecked}개</span>
           <button type="button" class="link end" data-regrade>다시 채점</button>${gradeToggle()}</div>`;
   const rules = result.rules
     .map((rule) => {
@@ -402,7 +402,10 @@ function gradeTab() {
     .join("");
   let detail;
   if (total === 0) {
-    detail = '<section class="panel pass-panel"><span class="pass-mark">✓</span><div><strong>통과</strong><span class="muted">규칙 6개를 모두 지켰어요</span></div></section>';
+    const checked = result.rules.filter((rule) => rule.count !== null).length;
+    const skipped = result.rules.length - checked;
+    const note = skipped === 0 ? `규칙 ${checked}개를 모두 지켰어요` : `검사한 규칙 ${checked}개를 모두 지켰어요 · ${skipped}개는 시작 태그와 비교해야 해서 해당 없음`;
+    detail = `<section class="panel pass-panel"><span class="pass-mark">✓</span><div><strong>통과</strong><span class="muted">${note}</span></div></section>`;
   } else {
     const titles = new Map(result.rules.map((rule) => [rule.id, rule.title]));
     const shown = state.showAllViolations ? result.violations : result.violations.slice(0, VIOLATION_PAGE);

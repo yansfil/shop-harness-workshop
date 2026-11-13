@@ -69,6 +69,25 @@ describe("읽지 못한 줄", () => {
     expect(requests).toHaveLength(5);
   });
 
+  it("Claude Code가 쓰지 않는 줄 종류와 모양이 다른 user 줄은 읽지 못한 줄로 센다", () => {
+    const lines = [
+      assistantLine("msg_A", { type: "text", text: "a" }),
+      JSON.stringify({ type: "future-assistant-v2", timestamp: "2026-11-16T00:00:00Z", message: { id: "new-format" } }),
+      JSON.stringify({ type: "user", timestamp: "2026-11-16T00:00:00Z", message: 42 }),
+      JSON.stringify({ type: "file-history-snapshot", messageId: "m", snapshot: {} }),
+    ];
+    expect(parseTranscript(`${lines.join("\n")}\n`).unreadable).toEqual([
+      { line: 2, afterRequest: 1, reason: "알 수 없는 줄 종류예요(future-assistant-v2)" },
+      { line: 3, afterRequest: 1, reason: "알 수 없는 줄 형식이에요" },
+    ]);
+  });
+
+  it("실제 세션 기록의 줄은 모두 읽는다", () => {
+    for (const name of ["session-original.jsonl", "session-fork.jsonl", "session-branch.jsonl"]) {
+      expect(parseTranscript(fixture(name)).unreadable).toEqual([]);
+    }
+  });
+
   it("토큰 정보가 없는 응답 줄도 읽지 못한 줄로 센다", () => {
     const line = JSON.stringify({ type: "assistant", timestamp: "2026-11-16T01:00:00.000Z", message: { id: "msg_A", model: "claude-haiku-5-5", content: [] } });
     expect(parseTranscript(`${line}\n`).unreadable).toEqual([{ line: 1, afterRequest: 0, reason: "토큰 정보가 없는 응답 줄이에요" }]);

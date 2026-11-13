@@ -2,6 +2,7 @@
 // 1~4는 파일 내용을 TypeScript 구문 트리로 읽어 검사하고, 5·6은 시작 태그와의 차이(diff)로 검사한다.
 // 규칙의 설명과 예시는 docs/rules/와 docs/architecture.md에 있다.
 import path from "node:path";
+import { OrderStatusSchema } from "@grabmarket/contracts";
 import ts from "typescript";
 
 export type RuleId = "layer-import" | "new-date" | "request-customer-id" | "status-assignment" | "test-expect-change" | "migration-change";
@@ -27,6 +28,12 @@ export interface Violation {
   file: string;
   line: number;
   message: string;
+}
+
+/** 위반과, 그 위반을 낸 문장(구문 노드)의 토큰. 시작 태그 때의 같은 문장과 맞춰 보는 데 쓴다. */
+export interface Finding {
+  violation: Violation;
+  statement: string;
 }
 
 type Layer = "web" | "application" | "domain" | "infra";
@@ -72,6 +79,14 @@ function lineOf(source: ts.SourceFile, node: ts.Node): number {
   return source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1;
 }
 
+/** 노드의 토큰을 공백 하나로 이어 붙인 것. 줄바꿈·들여쓰기·주석만 바뀐 문장은 같은 값이 된다. */
+function statementTokens(source: ts.SourceFile, node: ts.Node): string {
+  const scanner = ts.createScanner(ts.ScriptTarget.Latest, true, source.languageVariant, node.getText(source));
+  const tokens: string[] = [];
+  for (let kind = scanner.scan(); kind !== ts.SyntaxKind.EndOfFileToken; kind = scanner.scan()) tokens.push(scanner.getTokenText());
+  return tokens.join(" ");
+}
+
 function walk(node: ts.Node, visit: (node: ts.Node) => void): void {
   visit(node);
   ts.forEachChild(node, (child) => {
@@ -92,34 +107,38 @@ function moduleSpecifiers(source: ts.SourceFile): { specifier: string; node: ts.
   return found;
 }
 
-function checkLayerImports(file: string, source: ts.SourceFile): Violation[] {
+function finding(source: ts.SourceFile, node: ts.Node, rule: RuleId, message: string): Finding {
+  return { violation: { rule, file: source.fileName, line: lineOf(source, node), message }, statement: statementTokens(source, node) };
+}
+
+function checkLayerImports(file: string, source: ts.SourceFile): Finding[] {
   const from = layerOf(file);
   if (from === null || from.module === SHARED_MODULE) return [];
-  const violations: Violation[] = [];
+  const violations: Finding[] = [];
   for (const { specifier, node } of moduleSpecifiers(source)) {
     if (specifier === DB_PACKAGE || specifier.startsWith(`${DB_PACKAGE}/`)) {
-      if (from.layer !== "infra") violations.push({ rule: "layer-import", file, line: lineOf(source, node), message: `${from.layer}에서 ${DB_PACKAGE}를 가져와요` });
+      if (from.layer !== "infra") violations.push(finding(source, node, "layer-import", `${from.layer}에서 ${DB_PACKAGE}를 가져와요`));
       continue;
     }
     if (!specifier.startsWith(".")) continue;
     const target = layerOf(path.posix.normalize(path.posix.join(path.posix.dirname(file), specifier)));
     if (target === null || target.module === SHARED_MODULE) continue;
     if (FORBIDDEN_TARGETS[from.layer].includes(target.layer)) {
-      violations.push({ rule: "layer-import", file, line: lineOf(source, node), message: `${from.layer}에서 ${target.layer}를 가져와요` });
+      violations.push(finding(source, node, "layer-import", `${from.layer}에서 ${target.layer}를 가져와요`));
     }
   }
   return violations;
 }
 
-function checkNewDate(file: string, source: ts.SourceFile): Violation[] {
+function checkNewDate(file: string, source: ts.SourceFile): Finding[] {
   if (file === CLOCK_FILE) return [];
-  const violations: Violation[] = [];
+  const violations: Finding[] = [];
   walk(source, (node) => {
     const isNewDateNow = ts.isNewExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === "Date" && (node.arguments === undefined || node.arguments.length === 0);
     const isDateNow =
       ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression) && ts.isIdentifier(node.expression.expression) && node.expression.expression.text === "Date" && node.expression.name.text === "now";
     if (isNewDateNow || isDateNow) {
-      violations.push({ rule: "new-date", file, line: lineOf(source, node), message: "Clock을 주입받지 않았어요" });
+      violations.push(finding(source, node, "new-date", "Clock을 주입받지 않았어요"));
     }
   });
   return violations;
@@ -133,11 +152,11 @@ function isRequestPart(node: ts.Node): boolean {
   return ts.isPropertyAccessExpression(node) && REQUEST_PARTS.has(node.name.text);
 }
 
-function checkRequestCustomerId(file: string, source: ts.SourceFile): Violation[] {
+function checkRequestCustomerId(file: string, source: ts.SourceFile): Finding[] {
   if (!file.startsWith("apps/api/src/")) return [];
-  const violations: Violation[] = [];
+  const violations: Finding[] = [];
   const report = (node: ts.Node, key: string): void => {
-    violations.push({ rule: "request-customer-id", file, line: lineOf(source, node), message: `요청에서 ${key}를 읽어요` });
+    violations.push(finding(source, node, "request-customer-id", `요청에서 ${key}를 읽어요`));
   };
   walk(source, (node) => {
     if (ts.isPropertyAccessExpression(node) && CUSTOMER_KEYS.has(node.name.text) && isRequestPart(node.expression)) {
@@ -156,35 +175,69 @@ function checkRequestCustomerId(file: string, source: ts.SourceFile): Violation[
 
 const ASSIGNMENT_OPERATORS = new Set([ts.SyntaxKind.EqualsToken, ts.SyntaxKind.QuestionQuestionEqualsToken, ts.SyntaxKind.BarBarEqualsToken, ts.SyntaxKind.AmpersandAmpersandEqualsToken]);
 const UPDATE_STATUS_SQL = /\bUPDATE\s+orders\s+SET\b[^;]*\bstatus\s*=/i;
-const TRANSITION_DIR = /^apps\/api\/src\/orders\/domain\//;
+const ORDER_STATUSES: ReadonlySet<string> = new Set(OrderStatusSchema.options);
+const ORDERS_MODULE = /^apps\/api\/src\/orders\//;
+const ORDERS_DOMAIN = /^apps\/api\/src\/orders\/domain\//;
+/** 주문 상태를 바꿀 수 있는 단 하나의 함수(docs/rules/03). */
+const TRANSITION_FUNCTION = "transitionStatus";
+const ORDER_NAME = /order/i;
 
-function checkStatusAssignment(file: string, source: ts.SourceFile): Violation[] {
-  if (!inServerCode(file) || TRANSITION_DIR.test(file)) return [];
+/** `X.status` 또는 `X["status"]`면 X, 아니면 null. */
+function statusReceiver(node: ts.Expression): ts.Expression | null {
+  if (ts.isPropertyAccessExpression(node) && node.name.text === "status") return node.expression;
+  if (ts.isElementAccessExpression(node) && ts.isStringLiteralLike(node.argumentExpression) && node.argumentExpression.text === "status") return node.expression;
+  return null;
+}
+
+/** node를 감싼 함수·메서드의 이름(안쪽부터). */
+function enclosingFunctionNames(node: ts.Node): string[] {
+  const names: string[] = [];
+  // 소스 파일 노드의 parent는 실행 중에는 undefined다(타입 선언은 늘 있다고 적는다).
+  for (let current = node.parent as ts.Node | undefined; current !== undefined; current = current.parent as ts.Node | undefined) {
+    if ((ts.isFunctionDeclaration(current) || ts.isMethodDeclaration(current)) && current.name !== undefined) names.push(current.name.getText());
+    else if ((ts.isArrowFunction(current) || ts.isFunctionExpression(current)) && ts.isVariableDeclaration(current.parent)) names.push(current.parent.name.getText());
+  }
+  return names;
+}
+
+/**
+ * 대입되는 status가 주문 상태인지. 타입 정보 없이 구문만 보므로 다음 중 하나면 주문 상태로 본다.
+ * orders 모듈 안의 코드(주문 엔터티의 this.status 포함), 이름에 order가 든 대상(order.status), 주문 상태 값(paid 등)을 넣는 대입.
+ */
+function isOrderStatus(file: string, receiver: ts.Expression, value: ts.Expression): boolean {
+  if (ORDERS_MODULE.test(file)) return true;
+  if (receiver.kind !== ts.SyntaxKind.ThisKeyword && ORDER_NAME.test(receiver.getText())) return true;
+  return ts.isStringLiteralLike(value) && ORDER_STATUSES.has(value.text);
+}
+
+function checkStatusAssignment(file: string, source: ts.SourceFile): Finding[] {
+  if (!inServerCode(file)) return [];
   const inInfra = layerOf(file)?.layer === "infra";
-  const violations: Violation[] = [];
+  const inDomain = ORDERS_DOMAIN.test(file);
+  const violations: Finding[] = [];
   walk(source, (node) => {
     if (ts.isBinaryExpression(node) && ASSIGNMENT_OPERATORS.has(node.operatorToken.kind)) {
-      const left = node.left;
-      const isStatus =
-        (ts.isPropertyAccessExpression(left) && left.name.text === "status" && left.expression.kind !== ts.SyntaxKind.ThisKeyword) ||
-        (ts.isElementAccessExpression(left) && ts.isStringLiteralLike(left.argumentExpression) && left.argumentExpression.text === "status");
-      if (isStatus) violations.push({ rule: "status-assignment", file, line: lineOf(source, node), message: "상태를 직접 바꿨어요" });
+      const receiver = statusReceiver(node.left);
+      if (receiver !== null) {
+        const inTransition = inDomain && enclosingFunctionNames(node).includes(TRANSITION_FUNCTION);
+        if (!inTransition && isOrderStatus(file, receiver, node.right)) violations.push(finding(source, node, "status-assignment", "주문 상태를 전이 함수 밖에서 바꿨어요"));
+      }
     }
     // 저장은 infra repository의 일이다. 그 밖에서 주문 상태를 SQL로 바꾸면 전이 함수를 건너뛴 것이다.
     if (!inInfra && (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node) || ts.isTemplateExpression(node))) {
-      if (UPDATE_STATUS_SQL.test(node.getText(source))) violations.push({ rule: "status-assignment", file, line: lineOf(source, node), message: "SQL로 주문 상태를 바꿨어요" });
+      if (UPDATE_STATUS_SQL.test(node.getText(source))) violations.push(finding(source, node, "status-assignment", "SQL로 주문 상태를 바꿨어요"));
     }
   });
   return violations;
 }
 
-/** 규칙 1~4: 파일 내용을 보고 위반을 찾는다. 줄 번호는 1부터. */
-export function checkContent(file: string, content: string): Violation[] {
+/** 규칙 1~4: 파일 내용을 보고 위반을 찾는다. 줄 번호는 위반을 낸 문장의 첫 줄(1부터). */
+export function findViolations(file: string, content: string): Finding[] {
   if (!isTypeScript(file)) return [];
   const source = parse(file, content);
-  const violations = [...checkLayerImports(file, source), ...checkRequestCustomerId(file, source), ...checkStatusAssignment(file, source)];
-  if (inServerCode(file)) violations.push(...checkNewDate(file, source));
-  return violations;
+  const findings = [...checkLayerImports(file, source), ...checkRequestCustomerId(file, source), ...checkStatusAssignment(file, source)];
+  if (inServerCode(file)) findings.push(...checkNewDate(file, source));
+  return findings;
 }
 
 export function isTestFile(file: string): boolean {
@@ -195,21 +248,31 @@ export function isMigrationFile(file: string): boolean {
   return /^packages\/db\/migrations\/[^/]+$/.test(file);
 }
 
-/** 테스트 파일에서 expect(...) 문이 차지하는 줄 범위(1부터, 양 끝 포함). 여러 줄에 걸친 기대값도 잡는다. */
-export function expectLineRanges(file: string, content: string): [number, number][] {
+export interface ExpectStatement {
+  /** 문장의 첫 줄(1부터). */
+  line: number;
+  statement: string;
+}
+
+/** 기대를 적는 호출: vitest의 expect(...)와 Supertest 체인의 .expect(...). */
+function isExpectCall(node: ts.Node): boolean {
+  if (!ts.isCallExpression(node)) return false;
+  const callee = node.expression;
+  return (ts.isIdentifier(callee) && callee.text === "expect") || (ts.isPropertyAccessExpression(callee) && callee.name.text === "expect");
+}
+
+/**
+ * 테스트 파일에서 기대 호출이 든 문장. expect(a).toBe(b), await expect(p).rejects...,
+ * const response = await request(app).post(...).expect(201) 처럼 여러 줄에 걸친 문장 전체를 하나로 본다.
+ */
+export function expectStatements(file: string, content: string): ExpectStatement[] {
   const source = parse(file, content);
-  const ranges: [number, number][] = [];
+  const found: ExpectStatement[] = [];
+  // it(...) 안의 함수 몸통으로는 들어가지 않는다. 그 안의 문장은 따로 하나씩 센다.
+  const hasExpect = (inner: ts.Node): boolean => !ts.isFunctionLike(inner) && (isExpectCall(inner) || (ts.forEachChild(inner, hasExpect) ?? false));
   walk(source, (node) => {
-    if (!ts.isExpressionStatement(node)) return;
-    // expect 사슬(expect(a).toBe(b), await expect(p).rejects...)인 문만 센다. it(...) 안의 함수 몸통으로는 들어가지 않는다.
-    const hasExpect = (inner: ts.Node): boolean => {
-      if (ts.isFunctionLike(inner)) return false;
-      if (ts.isCallExpression(inner) && ts.isIdentifier(inner.expression) && inner.expression.text === "expect") return true;
-      return ts.forEachChild(inner, hasExpect) ?? false;
-    };
-    if (hasExpect(node.expression)) {
-      ranges.push([lineOf(source, node), source.getLineAndCharacterOfPosition(node.getEnd()).line + 1]);
-    }
+    if (!(ts.isExpressionStatement(node) || ts.isVariableStatement(node) || ts.isReturnStatement(node))) return;
+    if (ts.forEachChild(node, hasExpect) ?? false) found.push({ line: lineOf(source, node), statement: statementTokens(source, node) });
   });
-  return ranges;
+  return found;
 }
