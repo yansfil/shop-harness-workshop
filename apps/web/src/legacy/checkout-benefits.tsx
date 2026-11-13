@@ -2,10 +2,9 @@
 import { useState } from "react";
 import { Button } from "../components/button.tsx";
 import { Bone } from "../components/states.tsx";
-import { krw } from "../lib/format.ts";
 import { type AsyncState, useAsync } from "../lib/use-async.ts";
 import { legacyPost } from "./legacyApi.ts";
-import { pointText, signedKrw } from "./money.ts";
+import { pointText, signedKrw, wonText } from "./money.ts";
 import { fieldClass, labelClass } from "./ui.tsx";
 
 /** 금액 미리 보기 응답 중 주문서가 쓰는 칸 */
@@ -175,11 +174,11 @@ export function BenefitAmountRows({ quote }: { quote: AsyncState<CheckoutQuote> 
     <dl className="flex flex-col gap-3 text-sm">
       <div className="flex items-center justify-between">
         <dt className="text-ink-3">상품 합계</dt>
-        <dd className="font-semibold text-ink">{cell((d) => krw(d.subtotal))}</dd>
+        <dd className="font-semibold text-ink">{cell((d) => wonText(d.subtotal))}</dd>
       </div>
       <div className="flex items-center justify-between">
         <dt className="text-ink-3">배송비</dt>
-        <dd className="font-semibold text-ink">{cell((d) => krw(d.shippingFee))}</dd>
+        <dd className="font-semibold text-ink">{cell((d) => wonText(d.shippingFee))}</dd>
       </div>
       <div className="flex items-center justify-between">
         <dt className="text-ink-3">쿠폰 할인</dt>
@@ -191,7 +190,7 @@ export function BenefitAmountRows({ quote }: { quote: AsyncState<CheckoutQuote> 
       </div>
       <div className="mt-1 flex items-center justify-between border-t border-line pt-4">
         <dt className="font-bold text-ink">결제 금액</dt>
-        <dd className="text-2xl leading-9 font-extrabold text-ink">{data ? krw(data.paidAmount) : quote.status === "error" ? "-" : <Bone className="h-7 w-28" />}</dd>
+        <dd className="text-2xl leading-9 font-extrabold text-ink">{data ? wonText(data.paidAmount) : quote.status === "error" ? "-" : <Bone className="h-7 w-28" />}</dd>
       </div>
       <div className="flex items-center justify-between">
         <dt className="text-ink-3">적립 예정 포인트</dt>

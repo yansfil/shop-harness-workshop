@@ -3,7 +3,7 @@ import { type ReactNode, useState } from "react";
 import { Link, NavLink } from "react-router";
 import { Button } from "../components/button.tsx";
 import { Bone } from "../components/states.tsx";
-import { krw } from "../lib/format.ts";
+import { wonText } from "./money.ts";
 
 export const fieldClass = "h-10 w-full rounded-md border border-ink-3 bg-ground px-3 text-sm text-ink disabled:bg-canvas disabled:text-ink-3";
 export const labelClass = "text-xs-plus font-bold text-ink";
@@ -141,7 +141,7 @@ export function TableBox({ children }: { children: ReactNode }) {
 
 export function Money({ value, strong = false }: { value: number | null | undefined; strong?: boolean }) {
   if (value === null || value === undefined) return <span className="text-ink-3">-</span>;
-  return <span className={strong ? "font-extrabold" : ""}>{krw(value)}</span>;
+  return <span className={strong ? "font-extrabold" : ""}>{wonText(value)}</span>;
 }
 
 /** 표 불러오는 중 막대 */
@@ -256,8 +256,7 @@ export function TextLink({ to, children }: { to: string; children: ReactNode }) 
   );
 }
 
-/** 오늘 날짜 문자열 (YYYY-MM-DD, 한국 시각) */
-export function todayKst(): string {
-  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
-  return parts;
+/** 오늘 날짜 (YYYY-MM-DD). 예전 서버는 날짜를 UTC 하루로 다룬다(쿠폰 시작일·정산 일자) */
+export function todayUtc(): string {
+  return new Date().toISOString().slice(0, 10);
 }

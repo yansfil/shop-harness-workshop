@@ -4,10 +4,9 @@ import { type LoaderFunctionArgs, useLoaderData, useNavigate, useRevalidator, us
 import { Button } from "../../components/button.tsx";
 import { Loaded } from "../../components/loaded.tsx";
 import { EmptyState } from "../../components/states.tsx";
-import { krw } from "../../lib/format.ts";
 import { streamed } from "../../lib/streamed.ts";
 import { csvHref, errorText, fieldError, legacyGet, legacyPost } from "../legacyApi.ts";
-import { comma } from "../money.ts";
+import { comma, wonText } from "../money.ts";
 import {
   ConfirmDialog,
   CsvLink,
@@ -310,9 +309,9 @@ export function BreakdownPage() {
               />
               <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
                 <Stat label="주문" value={comma(r.summary.orderCount) + "건"} sub={"앞 기간 대비 " + r.summary.orderCountChange} />
-                <Stat label="주문 금액" value={krw(r.summary.totalAmount)} sub={"앞 기간 대비 " + r.summary.totalChange} />
-                <Stat label="평균 주문 금액" value={krw(r.summary.averageOrder)} sub={"고객 " + comma(r.summary.customerCount) + "명"} />
-                <Stat label="취소·반품 환불" value={krw(r.summary.cancelAmount + r.summary.returnAmount)} sub={"취소 " + r.summary.cancelCount + "건 · 반품 " + r.summary.returnCount + "건"} />
+                <Stat label="주문 금액" value={wonText(r.summary.totalAmount)} sub={"앞 기간 대비 " + r.summary.totalChange} />
+                <Stat label="평균 주문 금액" value={wonText(r.summary.averageOrder)} sub={"고객 " + comma(r.summary.customerCount) + "명"} />
+                <Stat label="취소·반품 환불" value={wonText(r.summary.cancelAmount + r.summary.returnAmount)} sub={"취소 " + r.summary.cancelCount + "건 · 반품 " + r.summary.returnCount + "건"} />
               </div>
               <div className="grid gap-3 lg:grid-cols-2">
                 <Panel title="카테고리" aside={<CsvLink href={csvHref("/api/admin/settlements/breakdown/category.csv", range)} />}>
@@ -465,9 +464,9 @@ export function PayoutsPage() {
               <CsvLink href={csvHref("/api/admin/settlements/payouts.csv", { from: payouts.from, to: payouts.to })} />
             </div>
             <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-              <Stat label="지급 예정" value={krw(payouts.scheduledAmount)} sub={payouts.payoutRuleText} />
-              <Stat label="지급됨" value={krw(payouts.paidAmount)} />
-              <Stat label="조정 합계" value={krw(adjustments.totalAmount)} sub={adjustments.rows.filter((a: any) => !a.cancelled).length + "건"} />
+              <Stat label="지급 예정" value={wonText(payouts.scheduledAmount)} sub={payouts.payoutRuleText} />
+              <Stat label="지급됨" value={wonText(payouts.paidAmount)} />
+              <Stat label="조정 합계" value={wonText(adjustments.totalAmount)} sub={adjustments.rows.filter((a: any) => !a.cancelled).length + "건"} />
             </div>
             <div className="flex flex-col gap-3 lg:grid lg:grid-cols-[minmax(0,1fr)_24rem] lg:items-start">
               <PayoutTable rows={payouts.rows} />
@@ -492,7 +491,7 @@ function PayoutTable({ rows }: { rows: any[] }) {
     try {
       const r = await legacyPost("/api/admin/settlements/close/" + target.day);
       setTarget(null);
-      setNotice({ kind: "ok", text: r.dayText + " 다시 마감했어요" + (r.difference ? " (차이 " + krw(r.difference) + ")" : " (차이 없음)") });
+      setNotice({ kind: "ok", text: r.dayText + " 다시 마감했어요" + (r.difference ? " (차이 " + wonText(r.difference) + ")" : " (차이 없음)") });
       void revalidator.revalidate();
     } catch (e) {
       setError(errorText(e));
@@ -526,7 +525,7 @@ function PayoutTable({ rows }: { rows: any[] }) {
                 <Money value={r.netAmount} />
               </Td>
               <Td right className={r.adjustment < 0 ? "text-danger" : ""}>
-                {r.adjustment !== 0 ? krw(r.adjustment) : "-"}
+                {r.adjustment !== 0 ? wonText(r.adjustment) : "-"}
               </Td>
               <Td right>
                 <Money value={r.payoutAmount} strong />
@@ -664,7 +663,7 @@ function AdjustmentPanel({ adjustments }: { adjustments: any }) {
             <li key={a.id} className={`flex items-start justify-between gap-3 border-b border-line px-4 py-3 last:border-b-0 md:px-6 ${a.cancelled ? "opacity-60" : ""}`}>
               <span className="min-w-0">
                 <span className="block text-sm font-bold text-ink">
-                  {a.dayText} <span className={a.amount < 0 ? "text-danger" : ""}>{krw(a.amount)}</span>
+                  {a.dayText} <span className={a.amount < 0 ? "text-danger" : ""}>{wonText(a.amount)}</span>
                 </span>
                 <span className="block text-xs-plus text-ink-2">
                   {a.reason} · {a.createdBy} {a.createdAtText}
@@ -802,10 +801,10 @@ function PaymentsView({ data, q }: { data: any; q: any }) {
       </form>
       <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
         <Stat label="주문" value={comma(data.count) + "건"} />
-        <Stat label="주문 금액" value={krw(data.sums.total)} />
-        <Stat label="쿠폰·포인트" value={krw(data.sums.couponDiscount + data.sums.pointUsed)} sub={"쿠폰 " + krw(data.sums.couponDiscount)} />
-        <Stat label="결제 금액" value={krw(data.sums.paidAmount)} />
-        <Stat label="환불" value={krw(data.sums.refundedAmount)} />
+        <Stat label="주문 금액" value={wonText(data.sums.total)} />
+        <Stat label="쿠폰·포인트" value={wonText(data.sums.couponDiscount + data.sums.pointUsed)} sub={"쿠폰 " + wonText(data.sums.couponDiscount)} />
+        <Stat label="결제 금액" value={wonText(data.sums.paidAmount)} />
+        <Stat label="환불" value={wonText(data.sums.refundedAmount)} />
       </div>
       <Panel title={"결제 " + comma(data.count) + "건"} aside={<span className="text-xs-plus text-ink-3">{data.page} / {data.pages} 쪽</span>}>
         {data.rows.length === 0 ? (
@@ -837,7 +836,7 @@ function PaymentsView({ data, q }: { data: any; q: any }) {
                   <Td right>
                     <Money value={r.total} />
                   </Td>
-                  <Td right>{r.couponDiscount !== 0 ? krw(r.couponDiscount) : "-"}</Td>
+                  <Td right>{r.couponDiscount !== 0 ? wonText(r.couponDiscount) : "-"}</Td>
                   <Td right>{r.pointUsed > 0 ? comma(r.pointUsed) + "P" : "-"}</Td>
                   <Td right>
                     <Money value={r.paidAmount} strong />

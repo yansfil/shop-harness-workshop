@@ -4,12 +4,12 @@ import { type LoaderFunctionArgs, useLoaderData, useNavigate, useRevalidator } f
 import { Button } from "../../components/button.tsx";
 import { Loaded } from "../../components/loaded.tsx";
 import { EmptyState } from "../../components/states.tsx";
-import { krw } from "../../lib/format.ts";
 import { useAsync } from "../../lib/use-async.ts";
 import { streamed } from "../../lib/streamed.ts";
 import { errorText, legacyGet, legacyPost } from "../legacyApi.ts";
 import { RETURN_TONE } from "../returns-pages.tsx";
 import { Notice, PageTitle, Panel, SegmentTabs, Stat, TableBox, TableSkeleton, Tag, Td, Th, fieldClass } from "../ui.tsx";
+import { wonText } from "../money.ts";
 
 const STATES = ["requested", "approved", "rejected", "withdrawn"];
 
@@ -105,7 +105,7 @@ function ReturnList({ data, onState }: { data: any; onState: (s: string) => void
                     <span className="block">{r.reasonText}</span>
                     {r.detail && <span className="block max-w-56 truncate text-xs text-ink-3">{r.detail}</span>}
                   </Td>
-                  <Td right>{r.kind === "return" ? krw(r.refundAmount) : "-"}</Td>
+                  <Td right>{r.kind === "return" ? wonText(r.refundAmount) : "-"}</Td>
                   <Td>
                     {r.state === "requested" ? (
                       <DecideInline
@@ -145,7 +145,7 @@ function DecideInline({ request, onDone }: { request: any; onDone: (text: string
     try {
       if (mode === "approve") {
         await legacyPost("/api/admin/returns/" + request.id + "/approve");
-        onDone(request.requestNo + " 승인했어요." + (request.kind === "return" ? " " + krw(request.refundAmount) + " 환불, 재고를 되돌렸어요." : " 교환 발송에서 송장을 넣어 주세요."));
+        onDone(request.requestNo + " 승인했어요." + (request.kind === "return" ? " " + wonText(request.refundAmount) + " 환불, 재고를 되돌렸어요." : " 교환 발송에서 송장을 넣어 주세요."));
       } else {
         await legacyPost("/api/admin/returns/" + request.id + "/reject", { reason: reason });
         onDone(request.requestNo + " 거절했어요.");
@@ -181,7 +181,7 @@ function DecideInline({ request, onDone }: { request: any; onDone: (text: string
   return (
     <span className="flex w-60 flex-col gap-1 rounded-sm bg-accent-soft p-2">
       <span className="text-xs-plus font-bold text-ink">
-        {mode === "approve" ? (request.kind === "return" ? krw(request.refundAmount) + " 환불하고 재고를 되돌릴까요?" : "교환을 승인할까요?") : "거절 이유를 적어 주세요"}
+        {mode === "approve" ? (request.kind === "return" ? wonText(request.refundAmount) + " 환불하고 재고를 되돌릴까요?" : "교환을 승인할까요?") : "거절 이유를 적어 주세요"}
       </span>
       {mode === "reject" && (
         <input
@@ -317,7 +317,7 @@ function StatsPanel() {
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <Stat label="신청" value={s.total + "건"} sub={s.from + " ~ " + s.to} />
         <Stat label="승인 비율" value={s.approvedRateText} />
-        <Stat label="반품 환불" value={krw(s.refundAmount)} />
+        <Stat label="반품 환불" value={wonText(s.refundAmount)} />
         <Stat label="처리까지 평균" value={s.averageDecisionText} />
       </div>
       <div className="grid gap-3 lg:grid-cols-2">

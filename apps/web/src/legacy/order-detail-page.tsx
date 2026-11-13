@@ -11,11 +11,11 @@ import { OrderSteps } from "../components/order-steps.tsx";
 import { Page } from "../components/page.tsx";
 import { Bone, EmptyState } from "../components/states.tsx";
 import { StatusBadge } from "../components/status-badge.tsx";
-import { formatShortTime, krw } from "../lib/format.ts";
+import { formatShortTime } from "../lib/format.ts";
 import { NotFoundError } from "../lib/not-found.ts";
 import { streamed } from "../lib/streamed.ts";
 import { errorText, fieldError, legacyGet, legacyPut } from "./legacyApi.ts";
-import { pointText, signedKrw } from "./money.ts";
+import { pointText, signedKrw, wonText } from "./money.ts";
 import { ConfirmDialog, FieldMessage, Notice, Tag, fieldClass, labelClass } from "./ui.tsx";
 
 export function orderDetailLoader({ params }: LoaderFunctionArgs) {
@@ -142,7 +142,7 @@ function OrderDetailView({ data }: { data: any }) {
                       {r.kindText}
                     </span>
                     <span className="flex items-center gap-3">
-                      {r.refundAmount > 0 && <span className="text-ink-2">{krw(r.refundAmount)}</span>}
+                      {r.refundAmount > 0 && <span className="text-ink-2">{wonText(r.refundAmount)}</span>}
                       <Tag tone={r.state === "approved" ? "green" : r.state === "rejected" ? "red" : r.state === "withdrawn" ? "muted" : "yellow"}>{r.stateText}</Tag>
                     </span>
                   </li>
@@ -229,11 +229,11 @@ function PaymentRows({ order, pay }: { order: any; pay: any }) {
     <dl className="flex flex-col gap-3 text-sm">
       <div className="flex justify-between">
         <dt className="text-ink-3">상품 합계</dt>
-        <dd className="font-semibold text-ink">{krw(order.subtotal)}</dd>
+        <dd className="font-semibold text-ink">{wonText(order.subtotal)}</dd>
       </div>
       <div className="flex justify-between">
         <dt className="text-ink-3">배송비</dt>
-        <dd className="font-semibold text-ink">{krw(order.shippingFee)}</dd>
+        <dd className="font-semibold text-ink">{wonText(order.shippingFee)}</dd>
       </div>
       {pay && pay.couponCode && (
         <div className="flex justify-between gap-3">
@@ -249,7 +249,7 @@ function PaymentRows({ order, pay }: { order: any; pay: any }) {
       )}
       <div className="flex items-center justify-between border-t border-line pt-4">
         <dt className="font-bold text-ink">결제 금액</dt>
-        <dd className="text-2xl leading-9 font-extrabold text-ink">{krw(paid)}</dd>
+        <dd className="text-2xl leading-9 font-extrabold text-ink">{wonText(paid)}</dd>
       </div>
       {pay && pay.rewardPoints > 0 && (
         <div className="flex justify-between">
@@ -260,7 +260,7 @@ function PaymentRows({ order, pay }: { order: any; pay: any }) {
       {pay && pay.refundedAmount > 0 && (
         <div className="flex justify-between">
           <dt className="text-ink-3">{pay.refundStatus === "full" ? "전액 환불" : "부분 환불"}</dt>
-          <dd className="font-semibold text-danger">{krw(pay.refundedAmount)}</dd>
+          <dd className="font-semibold text-danger">{wonText(pay.refundedAmount)}</dd>
         </div>
       )}
     </dl>
@@ -288,7 +288,7 @@ function CancelDialog({ order, pay, onClose, onDone }: { order: any; pay: any; o
       title="주문을 취소할까요?"
       body={
         <ul className="flex flex-col gap-1">
-          <li>결제 금액 {krw(refund)}을 돌려 드려요.</li>
+          <li>결제 금액 {wonText(refund)}을 돌려 드려요.</li>
           {pay && pay.couponCode && <li>쓴 쿠폰은 다시 쓸 수 있게 돌려 드려요.</li>}
           {pay && pay.pointUsed > 0 && <li>쓴 포인트 {pointText(pay.pointUsed)}를 돌려 드려요.</li>}
           <li>취소하면 되돌릴 수 없어요.</li>

@@ -13,7 +13,7 @@ import { Bone, EmptyState } from "../components/states.tsx";
 import { SummaryCard } from "../components/summary-box.tsx";
 import { type Benefits, BenefitAmountRows, BenefitsSection, checkoutOrder, rewardFor, useCheckoutQuote } from "../legacy/checkout-benefits.tsx";
 import { effectiveQuantity, isOrderable, loadPricedLines, type PricedLine } from "../lib/cart-products.ts";
-import { krw } from "../lib/format.ts";
+import { wonText } from "../legacy/money.ts";
 import { loginPath } from "../lib/login-path.ts";
 import { type CartLine, removeFromCart, selectedCartLines } from "../state/cart.ts";
 import { useRootData } from "../state/root-data.ts";
@@ -248,7 +248,7 @@ function CheckoutView({ rows, direct }: { rows: PricedLine[]; direct: boolean })
         {pay.status === "failed" && <PayFailure error={pay.error} />}
         <div className="mb-3 flex items-center justify-between">
           <span className="text-sm font-bold text-ink">결제 금액</span>
-          <span className="text-2xl leading-8 font-extrabold text-ink">{amounts !== null ? krw(amounts.paidAmount) : "-"}</span>
+          <span className="text-2xl leading-8 font-extrabold text-ink">{amounts !== null ? wonText(amounts.paidAmount) : "-"}</span>
         </div>
         {payButton}
       </div>

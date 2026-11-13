@@ -5,12 +5,11 @@ import { Button } from "../../components/button.tsx";
 import { Checkbox } from "../../components/checkbox.tsx";
 import { Loaded } from "../../components/loaded.tsx";
 import { EmptyState } from "../../components/states.tsx";
-import { krw } from "../../lib/format.ts";
 import { useAsync } from "../../lib/use-async.ts";
 import { streamed } from "../../lib/streamed.ts";
 import { csvHref, errorText, fieldError, legacyGet, legacyPost } from "../legacyApi.ts";
-import { comma } from "../money.ts";
-import { CsvLink, FieldMessage, Notice, PageTitle, Panel, SegmentTabs, TableBox, TableSkeleton, Tag, Td, Th, fieldClass, labelClass, todayKst } from "../ui.tsx";
+import { comma, wonText } from "../money.ts";
+import { CsvLink, FieldMessage, Notice, PageTitle, Panel, SegmentTabs, TableBox, TableSkeleton, Tag, Td, Th, fieldClass, labelClass, todayUtc } from "../ui.tsx";
 
 export const COUPON_TONE: any = { active: "green", scheduled: "blue", expired: "muted", exhausted: "gray", paused: "yellow" };
 
@@ -95,8 +94,8 @@ function CouponsView({ list, ending }: { list: any; ending: any[] }) {
                       <span className="block font-mono font-bold">{c.code}</span>
                       <span className="block max-w-48 truncate text-xs text-ink-3">{c.name}</span>
                     </Td>
-                    <Td right>{krw(c.discountAmount)}</Td>
-                    <Td right>{krw(c.minOrderAmount)}</Td>
+                    <Td right>{wonText(c.discountAmount)}</Td>
+                    <Td right>{wonText(c.minOrderAmount)}</Td>
                     <Td className="whitespace-nowrap text-ink-2">{c.endsAtText}</Td>
                     <Td right>
                       {comma(c.issuedCount)}/{comma(c.usedCount)}
@@ -135,7 +134,7 @@ function CouponsView({ list, ending }: { list: any; ending: any[] }) {
 
 function CreateCouponPanel({ onClose, onCreated }: { onClose: () => void; onCreated: (text: string) => void }) {
   const revalidator = useRevalidator();
-  const [form, setForm] = useState<any>({ code: "", name: "", discountAmount: "", minOrderAmount: "0", startsAt: todayKst(), endsAt: "", issueLimit: "100", sendToCustomers: true });
+  const [form, setForm] = useState<any>({ code: "", name: "", discountAmount: "", minOrderAmount: "0", startsAt: todayUtc(), endsAt: "", issueLimit: "100", sendToCustomers: true });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<any>(null);
   const field = (name: string, label: string, props: any = {}) => (
@@ -240,7 +239,7 @@ function CouponDetail({ coupon }: { coupon: any }) {
     <Panel title={<span className="font-mono">{coupon.code}</span>} aside={<Tag tone={COUPON_TONE[coupon.state] || "gray"}>{coupon.stateText}</Tag>}>
       <div className="flex flex-col gap-3 border-b border-line px-4 py-4 md:px-6">
         <p className="text-sm text-ink-2">
-          {coupon.name} · {krw(coupon.discountAmount)} 할인 · {krw(coupon.minOrderAmount)} 이상 · {coupon.endsAtText}
+          {coupon.name} · {wonText(coupon.discountAmount)} 할인 · {wonText(coupon.minOrderAmount)} 이상 · {coupon.endsAtText}
         </p>
         <Notice notice={notice} />
         <div className="flex flex-wrap gap-2">
@@ -348,7 +347,7 @@ function CouponDetail({ coupon }: { coupon: any }) {
                   {r.orderNumber} <span className="text-ink-3">{r.customerName}</span>
                 </span>
                 <span className="flex items-center gap-2">
-                  {krw(r.discount)}
+                  {wonText(r.discount)}
                   {r.state === "restored" && <Tag tone="muted">취소로 되돌림</Tag>}
                 </span>
               </li>

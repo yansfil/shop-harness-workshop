@@ -6,10 +6,10 @@ import { Checkbox } from "../components/checkbox.tsx";
 import { Loaded } from "../components/loaded.tsx";
 import { Page } from "../components/page.tsx";
 import { EmptyState } from "../components/states.tsx";
-import { krw } from "../lib/format.ts";
 import { streamed } from "../lib/streamed.ts";
 import { errorText, fieldError, legacyGet, legacyPost } from "./legacyApi.ts";
 import { ConfirmDialog, FieldMessage, Notice, PageTitle, Panel, TableSkeleton, Tag, fieldClass, labelClass } from "./ui.tsx";
+import { wonText } from "./money.ts";
 
 export const RETURN_TONE: any = { requested: "yellow", approved: "green", rejected: "red", withdrawn: "muted" };
 
@@ -82,7 +82,7 @@ function MyReturnsView({ requests }: { requests: any[] }) {
               · {r.itemSummary}
             </p>
             <p className="text-ink-2">사유: {r.reasonText}{r.detail ? " · " + r.detail : ""}</p>
-            {r.state === "approved" && r.kind === "return" && <p className="font-bold text-ink">환불 {krw(r.refundAmount)}</p>}
+            {r.state === "approved" && r.kind === "return" && <p className="font-bold text-ink">환불 {wonText(r.refundAmount)}</p>}
             {r.state === "rejected" && <p className="text-danger">거절 이유: {r.rejectReason}</p>}
             {r.reship && (
               <p className="text-ink-2">
@@ -234,7 +234,7 @@ function ReturnForm({ data, initialOrderId }: { data: any; initialOrderId: numbe
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm font-semibold text-ink">{i.productName}</span>
                       <span className="block text-xs-plus text-ink-3">
-                        {krw(i.unitPrice)} · {none ? "이미 신청한 상품" : "신청 가능 " + i.remaining + "개"}
+                        {wonText(i.unitPrice)} · {none ? "이미 신청한 상품" : "신청 가능 " + i.remaining + "개"}
                       </span>
                     </span>
                     {qty > 0 && (
@@ -313,7 +313,7 @@ function ReturnForm({ data, initialOrderId }: { data: any; initialOrderId: numbe
         </label>
         <dl className="mt-4 flex items-center justify-between border-t border-line pt-4">
           <dt className="text-sm font-bold text-ink">{kind === "return" ? "환불 예정 금액" : "교환 상품"}</dt>
-          <dd className="text-xl font-extrabold text-ink">{kind === "return" ? krw(refund) : lines.length + "종"}</dd>
+          <dd className="text-xl font-extrabold text-ink">{kind === "return" ? wonText(refund) : lines.length + "종"}</dd>
         </dl>
         {error && !fieldError(error, "items") && (
           <p role="alert" className="mt-3 rounded-sm bg-danger-soft px-3 py-2 text-xs-plus font-semibold text-danger">

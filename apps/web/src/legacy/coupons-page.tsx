@@ -5,10 +5,10 @@ import { LinkButton } from "../components/button.tsx";
 import { Loaded } from "../components/loaded.tsx";
 import { Page } from "../components/page.tsx";
 import { EmptyState } from "../components/states.tsx";
-import { krw } from "../lib/format.ts";
 import { streamed } from "../lib/streamed.ts";
 import { legacyGet } from "./legacyApi.ts";
 import { PageTitle, SegmentTabs, TableSkeleton, Tag } from "./ui.tsx";
+import { wonText } from "./money.ts";
 
 export function couponsLoader() {
   return { result: streamed(legacyGet("/api/coupons/mine")) };
@@ -57,7 +57,7 @@ function CouponsView({ data }: { data: any }) {
           {rows.map((c: any) => (
             <li key={c.couponId} className={`flex overflow-hidden rounded-md border border-line bg-ground ${c.usable ? "" : "opacity-70"}`}>
               <div className={`flex w-28 shrink-0 flex-col items-center justify-center px-2 ${c.usable ? "bg-accent-soft" : "bg-canvas"}`}>
-                <span className="text-lg font-extrabold text-ink">{krw(c.discountAmount)}</span>
+                <span className="text-lg font-extrabold text-ink">{wonText(c.discountAmount)}</span>
                 <span className="text-xs text-ink-2">할인</span>
               </div>
               <div className="min-w-0 flex-1 p-4">
@@ -66,7 +66,7 @@ function CouponsView({ data }: { data: any }) {
                   <Tag tone={c.usable ? "green" : "muted"}>{STATE_TEXT[c.state] || c.state}</Tag>
                 </p>
                 <p className="mt-1 text-xs-plus text-ink-2">
-                  코드 <b className="font-mono font-bold text-ink">{c.code}</b> · {krw(c.minOrderAmount)} 이상 주문 · {c.endsAtText}
+                  코드 <b className="font-mono font-bold text-ink">{c.code}</b> · {wonText(c.minOrderAmount)} 이상 주문 · {c.endsAtText}
                 </p>
                 {c.reason && <p className="mt-1 text-xs text-ink-3">{c.reason}</p>}
               </div>
