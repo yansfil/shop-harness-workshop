@@ -92,6 +92,23 @@ describe("node cleanup.mjs", () => {
     expect(originalClaudeState(f)).toEqual(before);
   });
 
+  it.each(["원래 설정", "레포"])("실습 설정 폴더가 %s 안의 '..linked' 폴더로 연결돼 있으면 로그아웃·삭제 없이 거부한다", (where) => {
+    const { f, clean } = practiced();
+    const inside = path.join(where === "레포" ? f.repo : f.originalClaudeDir, "..linked");
+    mkdirSync(inside);
+    rmSync(f.practiceDir, { recursive: true });
+    symlinkSync(inside, f.practiceDir, "junction");
+    const before = originalClaudeState(f);
+    const result = f.run("cleanup.mjs", [], { input: "n\ny\n" });
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('cleanup.mjs가 "지울 것 미리 보기" 단계에서 멈췄습니다');
+    expect(f.claudeLog()).toEqual([]);
+    expect(lstatSync(f.practiceDir).isSymbolicLink()).toBe(true);
+    expect(existsSync(clean)).toBe(true);
+    expect(originalClaudeState(f)).toEqual(before);
+  });
+
   it("기록 내보내기를 고르면 viewer.mjs --export로 레포 안 exports/에 내보낸다", () => {
     const { f } = practiced();
     writeFileSync(

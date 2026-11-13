@@ -26,11 +26,21 @@ function realPath(target: string): string {
   return path.join(real, ...rest);
 }
 
-/** inner가 outer와 같거나 그 안에 있는지. Windows는 대소문자를 가리지 않는다. */
-function within(inner: string, outer: string): boolean {
-  const fold = (p: string): string => (process.platform === "win32" ? p.toLowerCase() : p);
-  const relative = path.relative(fold(outer), fold(inner));
-  return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
+/**
+ * child가 parent와 같거나 그 안(자식·손자…)에 있는지. 이 레포의 경로 포함 판정은 모두 이 함수만 쓴다.
+ * 상대 경로의 첫 요소가 정확히 ".."일 때만 밖으로 본다("..linked" 같은 이름은 안이다).
+ * Windows는 대소문자(드라이브 문자 포함)를 가리지 않고, 다른 드라이브면 path.relative가 절대 경로를 돌려주므로 밖이다.
+ */
+export function isInsideOrEqual(child: string, parent: string, platform: NodeJS.Platform = process.platform): boolean {
+  const paths = platform === "win32" ? path.win32 : path.posix;
+  const normalize = (p: string): string => (platform === "win32" ? paths.resolve(p).toLowerCase() : paths.resolve(p));
+  const relative = paths.relative(normalize(parent), normalize(child));
+  return relative === "" || (relative !== ".." && !relative.startsWith(`..${paths.sep}`) && !paths.isAbsolute(relative));
+}
+
+/** 두 경로가 같은 위치인지. */
+export function isSamePath(a: string, b: string): boolean {
+  return isInsideOrEqual(a, b) && isInsideOrEqual(b, a);
 }
 
 /**
@@ -52,14 +62,14 @@ export function resolvePracticeConfigDir(home: string = os.homedir()): string {
   ];
   for (const { target, label } of guarded) {
     const realTarget = realPath(target);
-    if (within(real, realTarget) || within(realTarget, real)) {
+    if (isInsideOrEqual(real, realTarget) || isInsideOrEqual(realTarget, real)) {
       throw new StepFailure(`실습 설정 폴더 ${configDir}의 실제 위치(${real})가 ${label} ${target}와 겹칩니다. 아무것도 바꾸지 않았습니다.`, [
         `${configDir}가 링크라면 지우고(원래 폴더는 그대로 둡니다) 다시 실행하세요.`,
       ]);
     }
   }
   // 홈 폴더 자체나 그 위면 원래 ~/.claude.json과 겹친다.
-  if (within(realPath(home), real)) {
+  if (isInsideOrEqual(realPath(home), real)) {
     throw new StepFailure(`실습 설정 폴더 ${configDir}의 실제 위치(${real})가 홈 폴더와 같거나 그 위입니다. 아무것도 바꾸지 않았습니다.`, [
       `${configDir}가 링크라면 지우고 다시 실행하세요.`,
     ]);

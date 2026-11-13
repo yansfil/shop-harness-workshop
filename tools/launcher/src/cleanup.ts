@@ -6,7 +6,7 @@ import os from "node:os";
 import path from "node:path";
 import { createInterface } from "node:readline";
 import { capture, findHere, runVisible } from "./command.ts";
-import { claudeEnv, REPO_ROOT, resolvePracticeConfigDir } from "./paths.ts";
+import { claudeEnv, isSamePath, REPO_ROOT, resolvePracticeConfigDir } from "./paths.ts";
 import { runSteps, StepFailure } from "./report.ts";
 
 const SCRIPT = "cleanup.mjs";
@@ -33,13 +33,6 @@ export function parseLinkedWorktrees(porcelain: string): string[] {
   return paths.slice(1);
 }
 
-function samePath(a: string, b: string): boolean {
-  const real = (p: string): string => (existsSync(p) ? realpathSync.native(p) : path.resolve(p));
-  const left = real(a);
-  const right = real(b);
-  return process.platform === "win32" ? left.toLowerCase() === right.toLowerCase() : left === right;
-}
-
 function gitPath(): string {
   const git = findHere("git");
   if (git === null) throw new StepFailure("PATH에서 git 명령을 찾지 못했습니다.", ["https://git-scm.com/downloads 에서 git을 설치하세요."]);
@@ -49,7 +42,7 @@ function gitPath(): string {
 function practiceWorktrees(): string[] {
   const result = capture(gitPath(), ["worktree", "list", "--porcelain"], { cwd: REPO_ROOT });
   if (result.status !== 0) throw new StepFailure(`git worktree list가 실패했습니다(종료 코드 ${result.status}). ${result.stderr.trim()}`);
-  return parseLinkedWorktrees(result.stdout).filter((worktree) => existsSync(worktree) && !samePath(worktree, REPO_ROOT));
+  return parseLinkedWorktrees(result.stdout).filter((worktree) => existsSync(worktree) && !isSamePath(realpathSync.native(worktree), realpathSync.native(REPO_ROOT)));
 }
 
 function claudePath(): string {

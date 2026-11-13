@@ -6,7 +6,7 @@ import os from "node:os";
 import path from "node:path";
 import { parseEnv } from "node:util";
 import { capture, findHere, runVisible, spawnInteractive } from "./command.ts";
-import { claudeEnv, OBSERVER_SETTINGS_PATH, REPO_ROOT, resolvePracticeConfigDir } from "./paths.ts";
+import { claudeEnv, isInsideOrEqual, isSamePath, OBSERVER_SETTINGS_PATH, REPO_ROOT, resolvePracticeConfigDir } from "./paths.ts";
 import { runSteps, StepFailure, type Step } from "./report.ts";
 
 const SCRIPT = "start.mjs";
@@ -22,8 +22,7 @@ export const CLAUDE_INSTALL_HELP = [
 
 /** 레포 안이면 레포 기준 경로, 밖이면 전체 경로. */
 function relative(file: string): string {
-  const inside = path.relative(REPO_ROOT, file);
-  return inside === "" || inside.startsWith("..") || path.isAbsolute(inside) ? file : inside;
+  return isInsideOrEqual(file, REPO_ROOT) && !isSamePath(file, REPO_ROOT) ? path.relative(REPO_ROOT, file) : file;
 }
 
 /** PATH에서 claude를 찾고 --version으로 실행되는지 본다. 찾은 경로를 돌려준다. */

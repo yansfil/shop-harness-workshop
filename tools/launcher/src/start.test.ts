@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { existsSync, readdirSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
@@ -98,6 +98,21 @@ describe("node start.mjs", () => {
     expect(result.status).not.toBe(0);
     expect(result.stderr).toContain("[2/7] 실습 설정 폴더 위치: 실패");
     expect(result.stderr).toContain("원래 설정");
+    expect(fixture.claudeLog()).toEqual([]);
+    expect(existsSync(path.join(fixture.repo, ".env"))).toBe(false);
+    expect(originalClaudeState(fixture)).toEqual(before);
+  });
+
+  it("원래 ~/.claude 안의 '..linked' 같은 이름의 폴더로 연결돼 있어도 위치 확인 단계에서 거부한다", () => {
+    fixture = createFixture();
+    const inside = path.join(fixture.originalClaudeDir, "..linked");
+    mkdirSync(inside);
+    symlinkSync(inside, fixture.practiceDir, "junction");
+    const before = originalClaudeState(fixture);
+    const result = fixture.run("start.mjs");
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("[2/7] 실습 설정 폴더 위치: 실패");
     expect(fixture.claudeLog()).toEqual([]);
     expect(existsSync(path.join(fixture.repo, ".env"))).toBe(false);
     expect(originalClaudeState(fixture)).toEqual(before);
