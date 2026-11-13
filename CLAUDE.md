@@ -32,3 +32,16 @@
 | `tests` | API 통합 테스트 |
 | `docs` | 문서 |
 | `data` | 로컬 SQLite 파일(git 제외) |
+
+## 지킬 것
+
+채점기(`npm run grade`)가 잡은 실제 위반에서 나온 규칙입니다. 이유와 예시는 `docs/rules/`에 있습니다.
+
+- 계층 import 방향을 지킨다: web → application → domain ← infra. web은 infra·repository를 직접 부르지 않고 service를 부른다(docs/architecture.md).
+- 응답 DTO는 web 계층 mapper가 만든다. controller에서 객체 리터럴로 응답을 만들지 않는다.
+- `new Date()`를 쓰지 않는다. 주입받은 `Clock`의 `now()`를 쓴다.
+- 요청 본문·쿼리·경로의 `customerId`를 읽지 않는다. 고객은 세션에서만 정한다.
+- 주문 `status`는 orders 도메인의 전이 함수로만 바꾼다. 직접 대입하지 않는다.
+- 기존 테스트의 `expect` 값을 고치지 않는다. 테스트가 깨지면 코드를 고친다.
+- 기존 마이그레이션 파일을 고치지 않는다. 스키마 변경은 다음 번호 파일을 새로 만든다.
+- 끝내기 전에 `npm run verify`를 돌려 통과를 확인한다.
