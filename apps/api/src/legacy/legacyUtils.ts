@@ -255,10 +255,24 @@ function pad2(n: number): string {
   return n < 10 ? "0" + n : String(n);
 }
 
-/** 11-14 21:05 */
+const KST_OFFSET_MS = 9 * 3600000;
+
+/** 화면에 쓰는 시각은 한국 시각(UTC+9). 일자 키·마감 하루는 UTC 그대로 둔다. */
+function kst(value: any): Date {
+  return new Date(toDate(value).getTime() + KST_OFFSET_MS);
+}
+
+/** UTC "00:10" → 한국 시각 "09:10" */
+export function kstClock(hhmm: string): string {
+  const parts = String(hhmm).split(":");
+  const minutes = (Number(parts[0]) * 60 + Number(parts[1]) + 9 * 60) % (24 * 60);
+  return pad2(Math.floor(minutes / 60)) + ":" + pad2(minutes % 60);
+}
+
+/** 11-14 21:05 (한국 시각) */
 export function fmtMdHm(value: any): string {
   if (value == null || value === "") return "";
-  const d = toDate(value);
+  const d = kst(value);
   return pad2(d.getUTCMonth() + 1) + "-" + pad2(d.getUTCDate()) + " " + pad2(d.getUTCHours()) + ":" + pad2(d.getUTCMinutes());
 }
 
@@ -275,10 +289,10 @@ export function fmtDot(value: any): string {
   return ymd(value).replace(/-/g, ".");
 }
 
-/** 2026-11-14 21:05:33 */
+/** 2026-11-14 21:05:33 (한국 시각) */
 export function fmtFull(value: any): string {
   if (value == null || value === "") return "";
-  return toDate(value).toISOString().replace("T", " ").slice(0, 19);
+  return kst(value).toISOString().replace("T", " ").slice(0, 19);
 }
 
 /** 11월 */
@@ -308,7 +322,7 @@ export function relativeDayText(value: any): string {
 }
 
 export function timeOfDay(value: any): string {
-  const d = toDate(value);
+  const d = kst(value);
   return pad2(d.getUTCHours()) + ":" + pad2(d.getUTCMinutes());
 }
 

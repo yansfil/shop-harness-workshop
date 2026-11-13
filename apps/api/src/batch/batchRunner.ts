@@ -7,6 +7,7 @@ import {
   conflict,
   fmtDurationMs,
   fmtMdHm,
+  kstClock,
   log,
   logError,
   notFoundError,
@@ -84,7 +85,7 @@ export function history(job: string | null): any {
   return {
     schedule: Object.keys(BATCH_JOBS)
       .filter((k) => BATCH_JOBS[k].time)
-      .map((k) => ({ job: k, name: BATCH_JOBS[k].name, time: BATCH_JOBS[k].time })),
+      .map((k) => ({ job: k, name: BATCH_JOBS[k].name, time: kstClock(BATCH_JOBS[k].time) })),
     jobs: Object.keys(BATCH_JOBS).map((k) => ({ job: k, name: BATCH_JOBS[k].name })),
     jobStates: jobStates(),
     runs: rows.map((r: any) => ({
@@ -175,7 +176,7 @@ export function healthSummary(): any {
       return {
         job: k,
         name: BATCH_JOBS[k].name,
-        time: BATCH_JOBS[k].time,
+        time: BATCH_JOBS[k].time ? kstClock(BATCH_JOBS[k].time) : null,
         success: c.success,
         failed: c.failed,
         skipped: c.skipped,
@@ -209,7 +210,7 @@ export function jobStates(): any {
     out[k] = {
       job: k,
       name: BATCH_JOBS[k].name,
-      time: BATCH_JOBS[k].time,
+      time: BATCH_JOBS[k].time ? kstClock(BATCH_JOBS[k].time) : null,
       paused: !!(s && s.paused_at),
       pausedAtText: s && s.paused_at ? fmtMdHm(s.paused_at) : null,
       pausedBy: s && s.paused_at ? s.paused_by_name : null,
