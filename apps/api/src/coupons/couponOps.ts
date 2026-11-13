@@ -175,3 +175,16 @@ export function endingSoon(): any[] {
     unused: dao.unusedWalletFor(c.id).length,
   }));
 }
+
+/** 만료 예정 알림 대상: 3일 안에 끝나는데 아직 안 쓴 쿠폰을 가진 고객 */
+export function expiringWalletTargets(days: number): any[] {
+  const from = nowIso();
+  const to = addDays(startOfDay(now()), days + 1).toISOString();
+  const out: any[] = [];
+  for (const c of dao.endingBetween(from, to)) {
+    for (const w of dao.unusedWalletFor(c.id)) {
+      out.push({ userId: Number(w.user_id), couponId: c.id, name: c.name, discountAmount: c.discount_amount, endsAt: c.ends_at });
+    }
+  }
+  return out;
+}

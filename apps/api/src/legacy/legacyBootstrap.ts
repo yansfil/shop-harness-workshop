@@ -18,6 +18,7 @@ import { registerDeliveryOpsRoutes } from "../delivery/web/deliveryOpsController
 import { registerReturnOpsRoutes } from "../returns/web/returnOpsController.ts";
 import { registerNotificationSettingsRoutes } from "../notifications/web/notificationSettingsController.ts";
 import { registerAccountSummaryRoutes } from "./accountSummary.ts";
+import { registerAddressRoutes } from "../delivery/web/addressController.ts";
 import { listen } from "../notifications/notificationQueue.ts";
 import { startNotificationWorker, stopNotificationWorker } from "../notifications/notificationWorker.ts";
 import { startBatchScheduler, stopBatchScheduler } from "../batch/batchScheduler.ts";
@@ -34,6 +35,7 @@ export class LegacyRoutes implements Controller {
     registerSettlementReportRoutes(router);
     registerSettlementRoutes(router);
     registerDeliveryOpsRoutes(router);
+    registerAddressRoutes(router);
     registerDeliveryRoutes(router);
     registerReturnOpsRoutes(router);
     registerReturnRoutes(router);

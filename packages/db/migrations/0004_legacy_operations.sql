@@ -64,3 +64,17 @@ CREATE TABLE batch_run_logs (
   created_at TEXT    NOT NULL
 );
 CREATE INDEX batch_run_logs_run ON batch_run_logs (run_id);
+
+CREATE TABLE order_address_changes (
+  id              INTEGER PRIMARY KEY,
+  order_id        INTEGER NOT NULL REFERENCES orders (id),
+  changed_by      INTEGER REFERENCES users (id),
+  before_name     TEXT    NOT NULL,
+  before_phone    TEXT    NOT NULL,
+  before_address  TEXT    NOT NULL,
+  after_name      TEXT    NOT NULL,
+  after_phone     TEXT    NOT NULL,
+  after_address   TEXT    NOT NULL,
+  created_at      TEXT    NOT NULL
+);
+CREATE INDEX order_address_changes_order ON order_address_changes (order_id);

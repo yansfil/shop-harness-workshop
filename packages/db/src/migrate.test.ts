@@ -40,6 +40,7 @@ describe("migrate", () => {
       "notification_queue",
       "notification_settings",
       "notifications",
+      "order_address_changes",
       "order_cancellations",
       "order_items",
       "order_payments",

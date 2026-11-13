@@ -52,7 +52,7 @@ export function listByState(state: string, limit: number): any[] {
 
 export function countByState(): any {
   const rows = all("SELECT state, COUNT(*) AS n FROM return_requests GROUP BY state");
-  const out: any = { requested: 0, approved: 0, rejected: 0 };
+  const out: any = { requested: 0, approved: 0, rejected: 0, withdrawn: 0 };
   for (const r of rows) out[r.state] = Number(r.n);
   return out;
 }
@@ -122,4 +122,8 @@ export function addRefund(orderId: any, amount: number, atIso: string): void {
     atIso,
     Number(orderId),
   );
+}
+
+export function withdraw(id: any, atIso: string): number {
+  return Number(run("UPDATE return_requests SET state = 'withdrawn', decided_at = ? WHERE id = ? AND state = 'requested'", atIso, Number(id)).changes);
 }

@@ -2,6 +2,7 @@
 import type { Router } from "express";
 import { bodyOf, created, mustAdmin, ok, queryStr, sendCsv, wrap } from "../../legacy/legacyUtils.ts";
 import * as reports from "../settlementReports.ts";
+import * as paymentLookup from "../paymentLookup.ts";
 
 export function registerSettlementReportRoutes(router: Router): void {
   router.get(
@@ -50,6 +51,23 @@ export function registerSettlementReportRoutes(router: Router): void {
     wrap((req, res) => {
       mustAdmin(res);
       ok(res, reports.payouts(queryStr(req, "from"), queryStr(req, "to")));
+    }),
+  );
+
+  router.get(
+    "/api/admin/payments",
+    wrap((req, res) => {
+      mustAdmin(res);
+      ok(res, paymentLookup.search(req.query));
+    }),
+  );
+
+  router.get(
+    "/api/admin/payments.csv",
+    wrap((req, res) => {
+      mustAdmin(res);
+      const file = paymentLookup.searchCsv(req.query);
+      sendCsv(res, file.filename, file.csv);
     }),
   );
 

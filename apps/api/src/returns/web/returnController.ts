@@ -46,6 +46,14 @@ export function registerReturnRoutes(router: Router): void {
   );
 
   router.post(
+    "/api/returns/:returnId/withdraw",
+    wrap((req, res) => {
+      const user = mustCustomer(res);
+      ok(res, returnManager.withdraw(user, paramInt(req, "returnId")));
+    }),
+  );
+
+  router.post(
     "/api/admin/returns/:returnId/approve",
     wrap((req, res) => {
       const admin = mustAdmin(res);

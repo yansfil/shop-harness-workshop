@@ -193,6 +193,8 @@ export function listen(): void {
     enqueueForOrder(type, e.orderId, { itemText: e.itemText, requestNo: e.requestNo, refundAmount: e.refundAmount, reason: e.reason }, e.at);
   });
   on("points.expiring", (e: any) => enqueue(e.userId, "points_expiring", { points: e.points, dateText: e.dateText }, e.at));
+  on("coupon.expiring", (e: any) => enqueue(e.userId, "coupon_expiring", { couponId: e.couponId, name: e.name, discountAmount: e.discountAmount, dateText: e.dateText }, e.at));
+  on("address.changed", (e: any) => enqueueForOrder("address_changed", e.orderId, null, e.at));
   on("points.granted", (e: any) => enqueue(e.userId, "points_granted", { points: e.points, title: e.title }, e.at));
   on("exchange.shipped", (e: any) => enqueueForOrder("exchange_shipped", e.orderId, { itemText: e.itemText, requestNo: e.requestNo, trackingNo: e.trackingNo }, e.at));
 }

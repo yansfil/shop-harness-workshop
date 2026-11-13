@@ -8,6 +8,7 @@ import { delays } from "../../delivery/deliveryOps.ts";
 import { syncReships } from "../../returns/exchangeShipping.ts";
 import { expiringNoticeTargets } from "../../points/pointCampaigns.ts";
 import { cleanup } from "../../notifications/notificationSettings.ts";
+import { expiringWalletTargets } from "../../coupons/couponOps.ts";
 
 /**
  * 일 마감 정산: 어제 정산을 마감한다. 지난 7일 안에 빠진 날이 있으면 같이 마감한다.
@@ -87,6 +88,23 @@ export function shipmentDelayCheckJob(_runId: number, _runKey: string): any {
   };
 }
 
+/** 쿠폰 만료 예정 알림: 3일 안에 끝나는 안 쓴 쿠폰 */
+export function couponExpiringNoticeJob(_runId: number, _runKey: string): any {
+  const targets = expiringWalletTargets(3);
+  const at = nowIso();
+  const coupons: any = {};
+  for (const t of targets) {
+    emit("coupon.expiring", { userId: t.userId, couponId: t.couponId, name: t.name, discountAmount: t.discountAmount, dateText: fmtDot(t.endsAt), at: at });
+    coupons[t.name] = (coupons[t.name] || 0) + 1;
+  }
+  return {
+    processed: targets.length,
+    total: targets.length,
+    note: targets.length > 0 ? "고객 " + targets.length + "명에게 안내" : null,
+    logs: Object.keys(coupons).map((k) => k + ": " + coupons[k] + "명"),
+  };
+}
+
 /** 지난 알림 정리 */
 export function notificationCleanupJob(_runId: number, _runKey: string): any {
   const r = cleanup();
@@ -98,7 +116,7 @@ export function runKeyFor(job: string): string {
   if (job === "settlement_close") return ymd(addDays(startOfDay(now()), -1));
   if (job === "point_expire") return ymd(now());
   if (job === "points_expiring_notice") return ym(now());
-  if (job === "shipment_delay_check" || job === "notification_cleanup") return ymd(now());
+  if (job === "shipment_delay_check" || job === "notification_cleanup" || job === "coupon_expiring_notice") return ymd(now());
   const d = now();
   return d.toISOString().slice(0, 15) + "0";
 }
@@ -110,6 +128,7 @@ export const JOB_FUNCTIONS: any = {
   points_expiring_notice: pointsExpiringNoticeJob,
   shipment_delay_check: shipmentDelayCheckJob,
   notification_cleanup: notificationCleanupJob,
+  coupon_expiring_notice: couponExpiringNoticeJob,
 };
 
 /** 앞 배치에 기대는 작업: 포인트 소멸은 그날 정산 마감이 실패하면 건너뛴다 */

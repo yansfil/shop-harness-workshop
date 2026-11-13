@@ -185,7 +185,7 @@ export function mine(user: any): any {
 
 /** 관리자 목록 */
 export function adminList(stateInput: any): any {
-  const state = ["requested", "approved", "rejected"].indexOf(stateInput) >= 0 ? stateInput : "requested";
+  const state = ["requested", "approved", "rejected", "withdrawn"].indexOf(stateInput) >= 0 ? stateInput : "requested";
   const rows = dao.listByState(state, 300);
   const items = groupBy(dao.itemsOfMany(rows.map((r: any) => Number(r.id))), "return_id");
   return {
@@ -216,6 +216,17 @@ export function approve(admin: any, id: any): any {
   emit("return.decided", { orderId: r.order_id, kind: r.kind, state: "approved", requestNo: r.request_no, refundAmount: r.refund_amount, itemText: itemSummary(items), at: at });
   log("return_approved", { returnId: r.id, refund: r.refund_amount });
   return { request: requestDto(dao.findRequest(r.id), items), changed: true };
+}
+
+/** 고객 신청 취소: 승인 대기 중인 내 신청만 */
+export function withdraw(user: any, id: any): any {
+  const r = dao.findRequest(id);
+  if (!r || Number(r.user_id) !== Number(user.id)) throw notFoundError("반품 신청을 찾을 수 없습니다.");
+  if (r.state === "withdrawn") return { request: requestDto(r, dao.itemsOf(r.id)), changed: false };
+  if (r.state !== "requested") throw conflict("RETURN_ALREADY_DECIDED", "이미 " + RETURN_STATE_TEXT[r.state] + " 신청은 취소할 수 없어요.");
+  dao.withdraw(r.id, nowIso());
+  log("return_withdrawn", { returnId: r.id });
+  return { request: requestDto(dao.findRequest(r.id), dao.itemsOf(r.id)), changed: true };
 }
 
 /** 거절 */

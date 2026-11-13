@@ -830,7 +830,7 @@ export function returnReasonText(code: any): string {
 }
 
 export const RETURN_KIND_TEXT: any = { return: "반품", exchange: "교환" };
-export const RETURN_STATE_TEXT: any = { requested: "승인 대기", approved: "승인됨", rejected: "거절됨" };
+export const RETURN_STATE_TEXT: any = { requested: "승인 대기", approved: "승인됨", rejected: "거절됨", withdrawn: "신청 취소" };
 
 export const POINT_KIND_TEXT: any = {
   earn: "적립",
@@ -846,6 +846,8 @@ export const NOTIFY_TYPES: any = {
   shipping_started: { title: "배송이 시작됐어요", icon: "truck", label: "배송 시작" },
   delivered: { title: "배송이 완료됐어요", icon: "check", label: "배송 완료" },
   coupon_arrived: { title: "쿠폰이 도착했어요", icon: "ticket", label: "쿠폰 도착" },
+  coupon_expiring: { title: "쿠폰이 곧 끝나요", icon: "ticket", label: "쿠폰 만료 예정" },
+  address_changed: { title: "배송지를 바꿨어요", icon: "truck", label: "배송지 변경" },
   return_received: { title: "반품 신청을 받았어요", icon: "return", label: "반품 접수" },
   exchange_received: { title: "교환 신청을 받았어요", icon: "return", label: "교환 접수" },
   return_approved: { title: "반품이 승인됐어요", icon: "return", label: "반품 승인" },
@@ -870,6 +872,8 @@ export const NOTIFY_GROUPS: any = {
   return_rejected: "order",
   exchange_shipped: "order",
   coupon_arrived: "coupons",
+  coupon_expiring: "coupons",
+  address_changed: "order",
   points_expiring: "points",
   points_granted: "points",
   announcement: "announcements",
@@ -886,6 +890,7 @@ export const BATCH_JOBS: any = {
   points_expiring_notice: { name: "포인트 소멸 예정 알림", time: "09:00" },
   shipment_delay_check: { name: "배송 지연 점검", time: "08:00" },
   notification_cleanup: { name: "지난 알림 정리", time: "03:00" },
+  coupon_expiring_notice: { name: "쿠폰 만료 예정 알림", time: "10:00" },
 };
 
 export function batchJobName(job: any): string {
