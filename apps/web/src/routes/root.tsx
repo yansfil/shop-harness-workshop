@@ -25,7 +25,9 @@ export async function logoutAction() {
   return redirect("/");
 }
 
-export function logoutLoader() {
+/** 주소창으로 /logout을 열어도 로그아웃하고 홈으로 간다. 로그아웃 API는 로그인하지 않아도 부를 수 있다. */
+export async function logoutLoader() {
+  await callApi("logout");
   return redirect("/");
 }
 
