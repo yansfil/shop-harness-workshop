@@ -1,0 +1,1 @@
+아이콘: Material Design Icons(Apache-2.0, https://github.com/google/material-design-icons), Iconify ic 세트에서 가져왔다.

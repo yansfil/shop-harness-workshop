@@ -103,10 +103,11 @@ export class SqliteOrderRepository implements OrderRepository {
   }
 
   listAll(): AdminOrderRow[] {
-    return selectAll<{ id: number; order_number: string; customer_name: string; status: OrderStatus; total: number; item_count: number; created_at: string }>(
+    return selectAll<{ id: number; order_number: string; customer_name: string; status: OrderStatus; total: number; item_count: number; first_item_name: string; created_at: string }>(
       this.#db,
       `SELECT o.id, o.order_number, u.name AS customer_name, o.status, o.total, o.created_at,
-              (SELECT COUNT(*) FROM order_items i WHERE i.order_id = o.id) AS item_count
+              (SELECT COUNT(*) FROM order_items i WHERE i.order_id = o.id) AS item_count,
+              (SELECT i.product_name FROM order_items i WHERE i.order_id = o.id ORDER BY i.id LIMIT 1) AS first_item_name
          FROM orders o JOIN users u ON u.id = o.customer_id
         ORDER BY o.created_at DESC, o.id DESC`,
     ).map((row) => ({
@@ -116,6 +117,7 @@ export class SqliteOrderRepository implements OrderRepository {
       status: row.status,
       total: won(row.total),
       itemCount: row.item_count,
+      firstItemName: row.first_item_name,
       createdAt: new Date(row.created_at),
     }));
   }

@@ -66,6 +66,7 @@ export interface AdminOrderRow {
   status: OrderStatus;
   total: Money;
   itemCount: number;
+  firstItemName: string;
   createdAt: Date;
 }
 
