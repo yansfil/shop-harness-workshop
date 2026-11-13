@@ -447,6 +447,8 @@ const NPM_READ_ONLY = new Set(["run", "run-script", "test", "t", "ls", "view", "
 const COPY_LIKE = new Set(["cp", "install", "ln", "rsync", "mv", "Copy-Item", "Move-Item"]);
 // 기존 파일의 내용을 바꾸지 않는 명령(폴더·빈 파일 만들기). 작업 트리는 바뀔 수 있다.
 const CREATE_ONLY = new Set(["mkdir", "md", "touch", "New-Item"]);
+// 폴더만 만드는 명령. git은 빈 폴더를 다루지 않으므로 작업 트리 내용도 바뀌지 않는다.
+const FOLDER_ONLY = new Set(["mkdir", "md"]);
 // 인자를 통째로(폴더면 그 안까지) 지우거나 옮기는 명령. mv는 마지막 인자(목적지)를 뺀다.
 const REMOVERS = new Set(["rm", "rmdir", "rd", "del", "unlink", "rimraf", "Remove-Item", "mv", "Move-Item"]);
 const GIT_REMOVERS = new Set(["rm", "mv", "clean"]);
@@ -606,7 +608,8 @@ export function bulkScopes(simple) {
   return [];
 }
 
-/** 파일을 바꿀 수 있는 명령이면 true. */
+/** 파일을 바꿀 수 있는 명령이면 true. 폴더만 만드는 mkdir는 리다이렉션이 없으면 false. */
 export function changesFiles(simple) {
-  return !isReadOnly(simple) || outputTargets(simple).length > 0;
+  if (outputTargets(simple).length > 0) return true;
+  return !isReadOnly(simple) && !FOLDER_ONLY.has(commandName(simple.argv[0]));
 }

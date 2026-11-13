@@ -401,6 +401,11 @@ describe("stop-verify", () => {
     expect(stop(lines(use("a", "Bash", { command: "git diff --stat" })), T2)).toBeNull();
   });
 
+  it("폴더만 만들었으면(mkdir) 코드가 바뀌지 않았으므로 verify를 요구하지 않는다", () => {
+    expect(stop(lines(use("a", "Bash", { command: "mkdir -p packages/db/migrations" })), T2)).toBeNull();
+    expect(stop(lines(use("a", "Bash", { command: "touch apps/api/src/new.ts" })), T2)).toMatchObject({ decision: "block" });
+  });
+
   it("문서(.md)만 고쳤으면 verify를 요구하지 않는다", () => {
     expect(stop(lines(use("a", "Write", { file_path: "docs/tasks/x.md" })), T2)).toBeNull();
   });
