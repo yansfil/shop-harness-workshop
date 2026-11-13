@@ -7,7 +7,7 @@ export function AmountRows({
   amounts,
   status,
 }: {
-  amounts: { subtotal: number; shippingFee: number; total: number } | null;
+  amounts: { subtotal: number; shippingFee: number; total: number; freeShippingRemaining: number } | null;
   status: "loading" | "error" | "ready" | "idle";
 }) {
   const cell = (value: number | undefined, className = "h-4 w-16") =>
@@ -22,6 +22,9 @@ export function AmountRows({
         <dt className="text-ink-3">배송비</dt>
         <dd className="font-semibold text-ink">{status === "idle" ? krw(0) : cell(amounts?.shippingFee)}</dd>
       </div>
+      {amounts !== null && amounts.freeShippingRemaining > 0 && (
+        <p className="-mt-1 text-xs-plus font-semibold text-ink-2">{krw(amounts.freeShippingRemaining)} 더 담으면 무료배송</p>
+      )}
       <div className="mt-1 flex items-center justify-between border-t border-line pt-4">
         <dt className="font-bold text-ink">결제 금액</dt>
         <dd className="text-2xl leading-9 font-extrabold text-ink md:text-2xl">
