@@ -17,6 +17,7 @@ import { loginPath } from "../lib/login-path.ts";
 import { useQuote } from "../lib/use-quote.ts";
 import { type CartLine, removeFromCart, selectedCartLines } from "../state/cart.ts";
 import { useRootData } from "../state/root-data.ts";
+import { clearShippingDraft, readShippingDraft, saveShippingDraft } from "../state/shipping-draft.ts";
 
 /** 주문할 줄을 정한다. "바로 구매"는 주소의 productId·quantity, 그 밖에는 장바구니에서 고른 줄이다. */
 export function checkoutLoader({ request }: LoaderFunctionArgs) {
@@ -64,11 +65,14 @@ function CheckoutView({ rows, direct }: { rows: PricedLine[]; direct: boolean })
   const items = orderable.map((row) => ({ productId: row.line.productId, quantity: effectiveQuantity(row) }));
   const quote = useQuote(items);
 
-  const [shipping, setShipping] = useState<ShippingInfo>({
-    recipientName: user?.name ?? "",
-    phone: user?.phone ?? "",
-    address: user?.address ?? "",
-  });
+  const draft = user === null ? null : readShippingDraft(user.id);
+  const [shipping, setShipping] = useState<ShippingInfo>(
+    draft ?? {
+      recipientName: user?.name ?? "",
+      phone: user?.phone ?? "",
+      address: user?.address ?? "",
+    },
+  );
   const [editing, setEditing] = useState(user?.address == null || user.phone === null);
   const [pay, setPay] = useState<{ status: "idle" | "paying" } | { status: "failed"; error: ApiError }>({ status: "idle" });
   const [adminNotice, setAdminNotice] = useState(user?.role === "admin");
@@ -91,7 +95,9 @@ function CheckoutView({ rows, direct }: { rows: PricedLine[]; direct: boolean })
   const paying = pay.status === "paying";
 
   function edit(change: Partial<ShippingInfo>) {
-    setShipping((current) => ({ ...current, ...change }));
+    const next = { ...shipping, ...change };
+    setShipping(next);
+    if (user !== null) saveShippingDraft(user.id, next);
     // 내용이 바뀌면 다른 주문이므로 새 멱등 키를 쓴다. 같은 내용 재시도는 같은 키로 한 번만 반영된다.
     idempotencyKey.current = crypto.randomUUID();
     setPay({ status: "idle" });
@@ -103,6 +109,7 @@ function CheckoutView({ rows, direct }: { rows: PricedLine[]; direct: boolean })
       const { order } = await callApi("createOrder", {
         body: { idempotencyKey: idempotencyKey.current, items, shipping, paymentMethod: "virtual" },
       });
+      clearShippingDraft();
       if (!direct) removeFromCart(items.map((item) => item.productId));
       void navigate(`/orders/${order.id}/complete`, { replace: true });
     } catch (error) {
@@ -229,7 +236,11 @@ function CheckoutView({ rows, direct }: { rows: PricedLine[]; direct: boolean })
       </aside>
       <div className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-ground p-4 lg:hidden">
         {pay.status === "failed" && <PayFailure error={pay.error} />}
-        <div className="mb-3 flex items-center justify-between">
+        <div className="flex items-center justify-between text-xs-plus text-ink-2">
+          <span>상품 합계 {amounts !== null ? krw(amounts.subtotal) : "-"}</span>
+          <span>배송비 {amounts !== null ? krw(amounts.shippingFee) : "-"}</span>
+        </div>
+        <div className="mt-1 mb-3 flex items-center justify-between">
           <span className="text-sm font-bold text-ink">결제 금액</span>
           <span className="text-2xl leading-8 font-extrabold text-ink">{amounts !== null ? krw(amounts.total) : "-"}</span>
         </div>

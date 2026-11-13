@@ -28,7 +28,7 @@
 
   /* 보조색 오트밀. 보조색은 이 두 토큰으로만 쓴다(D-44) */
   --color-accent: #d9c7a6;
-  --color-accent-soft: #f3ebdd;
+  --color-accent-soft: color-mix(in srgb, var(--color-accent) 35%, var(--color-ground)); /* accent에서 파생, 값은 accent 하나에서만 정한다 */
 
   /* 주문 상태 뱃지 */
   --color-status-paid-bg: #e6e9ef;

@@ -95,32 +95,19 @@ export function LoginPage() {
             교육용 계정
           </h2>
           <p className="mt-1 text-sm text-ink-2">실습에 쓰는 계정이에요</p>
-          <table className="mt-5 w-full text-left text-sm">
-            <thead>
-              <tr className="border-b border-line text-xs-plus text-ink-3">
-                <th scope="col" className="pb-2 font-normal">
-                  구분
-                </th>
-                <th scope="col" className="pb-2 font-normal">
-                  이메일
-                </th>
-                <th scope="col" className="pb-2 font-normal">
-                  비밀번호
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {DEMO_ACCOUNTS.map((account) => (
-                <tr key={account.email} className="border-b border-line last:border-b-0">
-                  <th scope="row" className="h-12 pr-3 font-bold text-ink">
-                    {account.label}
-                  </th>
-                  <td className="pr-3 break-all text-ink">{account.email}</td>
-                  <td className="text-ink">{account.password}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <ul className="mt-5">
+            {DEMO_ACCOUNTS.map((account) => (
+              <li key={account.email} className="border-b border-line py-4 first:pt-0 last:border-b-0 last:pb-0">
+                <p className="font-bold text-ink">{account.label}</p>
+                <dl className="mt-2 grid grid-cols-[4.5rem_1fr] gap-y-1 text-sm">
+                  <dt className="text-ink-3">이메일</dt>
+                  <dd className="whitespace-nowrap text-ink">{account.email}</dd>
+                  <dt className="text-ink-3">비밀번호</dt>
+                  <dd className="whitespace-nowrap text-ink">{account.password}</dd>
+                </dl>
+              </li>
+            ))}
+          </ul>
         </section>
       </div>
       <p className="mt-6 text-center text-xs-plus text-ink-2">그랩마켓은 가상의 교육용 쇼핑몰이에요. 실제 결제와 배송은 이뤄지지 않아요.</p>
