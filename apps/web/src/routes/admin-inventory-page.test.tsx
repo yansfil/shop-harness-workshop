@@ -84,7 +84,7 @@ describe("관리자 재고 화면의 안전재고 알림", () => {
     expect(screen.getByRole("row", { name: /백미/ })).toBeInTheDocument();
   });
 
-  it("마지막 미만 상품까지 채우면 알림 줄이 사라지고 전체 목록이 보인다", async () => {
+  it("필터를 켠 채 마지막 미만 상품까지 채우면 필터는 유지되고 빈 상태에서 전체 보기로 돌아갈 수 있다", async () => {
     openInventory([stock(1, "제주 감귤 3kg", 10, 5), stock(2, "충전기", 3, 5)]);
     await userEvent.click(await screen.findByRole("button", { name: "안전재고 미만 1개" }));
 
@@ -97,6 +97,11 @@ describe("관리자 재고 화면의 안전재고 알림", () => {
     await waitFor(() => {
       expect(alertLine()).not.toBeInTheDocument();
     });
+    expect(screen.queryByRole("row", { name: /충전기/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("row", { name: /제주 감귤/ })).not.toBeInTheDocument();
+    expect(screen.getByText("안전재고 미만 상품이 없어요")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "전체 보기" }));
     expect(screen.getByRole("row", { name: /제주 감귤/ })).toBeInTheDocument();
     expect(screen.getByRole("row", { name: /충전기/ })).toBeInTheDocument();
   });

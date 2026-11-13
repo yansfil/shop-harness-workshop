@@ -41,9 +41,8 @@ function InventoryView({ initial }: { initial: InventoryItem[] }) {
   const [notice, setNotice] = useState<string | null>(null);
   const [lowOnly, setLowOnly] = useState(false);
   const lowCount = items.filter((item) => item.lowStock).length;
-  // 입고로 부족한 상품이 모두 사라지면 필터도 저절로 풀려서 빈 목록이 남지 않는다.
-  const filtering = lowOnly && lowCount > 0;
-  const visibleItems = filtering ? items.filter((item) => item.lowStock) : items;
+  // 필터는 사용자가 끈다. 입고로 부족한 상품이 모두 사라져도 켜진 채 남고, 빈 상태에서 끌 수 있다.
+  const visibleItems = lowOnly ? items.filter((item) => item.lowStock) : items;
 
   if (items.length === 0) {
     return (
@@ -78,62 +77,75 @@ function InventoryView({ initial }: { initial: InventoryItem[] }) {
       {lowCount > 0 && (
         <button
           type="button"
-          aria-pressed={filtering}
+          aria-pressed={lowOnly}
           onClick={() => {
-            setLowOnly(!filtering);
+            setLowOnly(!lowOnly);
           }}
           className="mb-3 flex h-12 w-full items-center justify-between rounded-md bg-danger-soft px-4 text-sm font-extrabold text-danger"
         >
           안전재고 미만 {lowCount}개
           <span aria-hidden="true" className="text-xs-plus font-semibold">
-            {filtering ? "전체 보기" : "부족한 상품만 보기"}
+            {lowOnly ? "전체 보기" : "부족한 상품만 보기"}
           </span>
         </button>
       )}
       <div className="flex flex-col gap-3 lg:grid lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start">
         <div className="overflow-hidden rounded-md border border-line bg-ground">
-          <table className="w-full border-collapse text-left text-sm">
-            <thead>
-              <tr className="h-10 text-xs-plus text-ink-3">
-                <th scope="col" className="px-6 font-normal">
-                  상품
-                </th>
-                <th scope="col" className="px-3 font-normal">
-                  카테고리
-                </th>
-                <th scope="col" className="px-6 text-right font-normal">
-                  재고 수량
-                </th>
-                <th scope="col" className="px-6 text-right font-normal">
-                  안전재고
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {visibleItems.map((item) => {
-                const selected = item.productId === selectedId;
-                return (
-                  <tr key={item.productId} aria-selected={selected} className={`h-12 border-t border-line ${selected ? "bg-accent-soft" : ""}`}>
-                    <td className="px-6 font-semibold text-ink">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSelectedId(item.productId);
-                        }}
-                        className="text-left"
-                      >
-                        {item.productName}
-                      </button>
-                      {item.lowStock && <span className="ml-2 rounded-sm bg-danger-soft px-2 py-0.5 align-middle text-xs font-bold whitespace-nowrap text-danger">안전재고 미만</span>}
-                    </td>
-                    <td className="px-3 text-ink-2">{item.categoryName}</td>
-                    <td className={`px-6 text-right text-base font-extrabold ${item.quantity === 0 ? "text-ink-3" : "text-ink"}`}>{item.quantity}개</td>
-                    <td className="px-6 text-right text-ink-2">{item.safetyStock}개</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+          {visibleItems.length === 0 ? (
+            <EmptyState title="안전재고 미만 상품이 없어요" hint="입고로 모두 채워졌어요">
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setLowOnly(false);
+                }}
+              >
+                전체 보기
+              </Button>
+            </EmptyState>
+          ) : (
+            <table className="w-full border-collapse text-left text-sm">
+              <thead>
+                <tr className="h-10 text-xs-plus text-ink-3">
+                  <th scope="col" className="px-6 font-normal">
+                    상품
+                  </th>
+                  <th scope="col" className="px-3 font-normal">
+                    카테고리
+                  </th>
+                  <th scope="col" className="px-6 text-right font-normal">
+                    재고 수량
+                  </th>
+                  <th scope="col" className="px-6 text-right font-normal">
+                    안전재고
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {visibleItems.map((item) => {
+                  const selected = item.productId === selectedId;
+                  return (
+                    <tr key={item.productId} aria-selected={selected} className={`h-12 border-t border-line ${selected ? "bg-accent-soft" : ""}`}>
+                      <td className="px-6 font-semibold text-ink">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedId(item.productId);
+                          }}
+                          className="text-left"
+                        >
+                          {item.productName}
+                        </button>
+                        {item.lowStock && <span className="ml-2 rounded-sm bg-danger-soft px-2 py-0.5 align-middle text-xs font-bold whitespace-nowrap text-danger">안전재고 미만</span>}
+                      </td>
+                      <td className="px-3 text-ink-2">{item.categoryName}</td>
+                      <td className={`px-6 text-right text-base font-extrabold ${item.quantity === 0 ? "text-ink-3" : "text-ink"}`}>{item.quantity}개</td>
+                      <td className="px-6 text-right text-ink-2">{item.safetyStock}개</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
         </div>
         <History item={items.find((item) => item.productId === selectedId) ?? null} version={historyVersion} />
       </div>
