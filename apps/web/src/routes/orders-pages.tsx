@@ -1,4 +1,4 @@
-import { type OrderDetail, type OrderSummary, OrderParamsSchema, PAYMENT_METHOD_LABELS } from "@grabmarket/contracts";
+import { type OrderSummary, OrderParamsSchema, PAYMENT_METHOD_LABELS } from "@grabmarket/contracts";
 import { Link, type LoaderFunctionArgs, useLoaderData } from "react-router";
 import { streamed } from "../lib/streamed.ts";
 import { callApi } from "../api/client.ts";
@@ -6,7 +6,6 @@ import { LinkButton } from "../components/button.tsx";
 import { Icon } from "../components/icon.tsx";
 import { Loaded } from "../components/loaded.tsx";
 import { OrderLines } from "../components/order-lines.tsx";
-import { OrderSteps } from "../components/order-steps.tsx";
 import { Page } from "../components/page.tsx";
 import { Bone, EmptyState } from "../components/states.tsx";
 import { StatusBadge } from "../components/status-badge.tsx";
@@ -128,73 +127,6 @@ const detailSkeleton = (
     <Bone className="h-40 w-full" />
   </div>
 );
-
-function MethodRows({ order }: { order: OrderDetail }) {
-  return (
-    <dl className="flex flex-col gap-3 text-sm">
-      <div className="flex justify-between gap-4">
-        <dt className="shrink-0 text-ink-3">결제 수단</dt>
-        <dd className="text-right font-semibold text-ink">{PAYMENT_METHOD_LABELS[order.paymentMethod]}</dd>
-      </div>
-      <div className="flex justify-between gap-4">
-        <dt className="shrink-0 text-ink-3">배송지</dt>
-        <dd className="text-right font-semibold text-ink">{order.shipping.address}</dd>
-      </div>
-    </dl>
-  );
-}
-
-export function MyOrderPage() {
-  const { result } = useLoaderData<typeof myOrderLoader>();
-  return (
-    <Page>
-      <Loaded resolve={result} failure="주문을 불러오지 못했어요" skeleton={detailSkeleton} notFound={orderNotFound}>
-        {({ order }) => (
-          <>
-            <Link to="/orders" className="inline-flex items-center gap-1 text-xs-plus font-semibold text-ink-2">
-              <Icon name="chevronLeft" className="size-4" />내 주문
-            </Link>
-            <h1 className="mt-3 flex flex-wrap items-center gap-3 text-xl leading-8 font-extrabold text-ink md:text-2xl">
-              주문 {order.orderNumber}
-              <StatusBadge status={order.status} />
-              <span className="text-sm leading-5 font-medium text-ink-3">{formatShortTime(order.createdAt)} 주문</span>
-            </h1>
-            <div className="mt-4 rounded-md border border-line bg-ground px-4 py-5 md:px-6 md:py-6">
-              <div className="mx-auto max-w-190">
-                <OrderSteps status={order.status} />
-              </div>
-            </div>
-            <div className="mt-3 flex flex-col gap-3 lg:grid lg:grid-cols-[minmax(0,1fr)_22.5rem] lg:items-start lg:gap-3">
-              <section aria-labelledby="order-items" className="rounded-md border border-line bg-ground">
-                <h2 id="order-items" className="flex h-12 items-center border-b border-line px-4 text-base font-extrabold text-ink md:px-6">
-                  주문 상품
-                </h2>
-                <OrderLines items={order.items} />
-              </section>
-              <aside aria-label="결제 정보" className="rounded-md border border-line bg-ground p-6">
-                <dl className="flex flex-col gap-3 text-sm">
-                  <div className="flex justify-between">
-                    <dt className="text-ink-3">상품 합계</dt>
-                    <dd className="font-semibold text-ink">{krw(order.subtotal)}</dd>
-                  </div>
-                  <div className="flex justify-between">
-                    <dt className="text-ink-3">배송비</dt>
-                    <dd className="font-semibold text-ink">{krw(order.shippingFee)}</dd>
-                  </div>
-                  <div className="mb-3 flex items-center justify-between border-t border-line pt-4">
-                    <dt className="font-bold text-ink">결제 금액</dt>
-                    <dd className="text-2xl leading-9 font-extrabold text-ink">{krw(order.total)}</dd>
-                  </div>
-                </dl>
-                <MethodRows order={order} />
-              </aside>
-            </div>
-          </>
-        )}
-      </Loaded>
-    </Page>
-  );
-}
 
 export function OrderCompletePage() {
   const { result } = useLoaderData<typeof myOrderLoader>();

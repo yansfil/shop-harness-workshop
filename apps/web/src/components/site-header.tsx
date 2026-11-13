@@ -4,6 +4,7 @@ import { useCartLines } from "../state/cart.ts";
 import { useRootData } from "../state/root-data.ts";
 import { Icon } from "./icon.tsx";
 import { SearchBox } from "./search-box.tsx";
+import { NotifyBell } from "../legacy/notify-bell.tsx";
 
 export function Logo({ className = "" }: { className?: string }) {
   return (
@@ -38,6 +39,7 @@ export function SiteHeader({ mobileCategories }: { mobileCategories: boolean }) 
           <Logo className="order-1 flex h-14 items-center text-logo-m leading-7 md:h-auto md:w-33 md:text-logo md:leading-9" />
           <nav aria-label="내 메뉴" className="order-2 ml-auto flex h-14 items-center gap-4 md:order-3 md:h-auto md:gap-6">
             {user !== null && <UserMenu key={location.key} name={user.name} admin={user.role === "admin"} />}
+            {user !== null && user.role === "customer" && <NotifyBell />}
             <Link to="/orders" className="flex flex-col items-center gap-0.5 text-2xs font-semibold text-ink-2 md:text-xs">
               <Icon name="receipt" className="size-5.5 text-ink md:size-6" />내 주문
             </Link>

@@ -3,18 +3,18 @@ import type { ShippingInfo, StockShortage } from "@grabmarket/contracts";
 import { PAYMENT_METHOD_LABELS } from "@grabmarket/contracts";
 import { useRef, useState } from "react";
 import { Link, Navigate, type LoaderFunctionArgs, redirect, useLoaderData, useLocation, useNavigate } from "react-router";
-import { ApiError, callApi, isApiError } from "../api/client.ts";
+import { ApiError, isApiError } from "../api/client.ts";
 import { AdminOrderNotice } from "../components/admin-order-notice.tsx";
 import { Button, LinkButton } from "../components/button.tsx";
 import { Loaded } from "../components/loaded.tsx";
 import { OrderLines } from "../components/order-lines.tsx";
 import { Page } from "../components/page.tsx";
 import { Bone, EmptyState } from "../components/states.tsx";
-import { AmountRows, SummaryCard } from "../components/summary-box.tsx";
+import { SummaryCard } from "../components/summary-box.tsx";
+import { type Benefits, BenefitAmountRows, BenefitsSection, checkoutOrder, rewardFor, useCheckoutQuote } from "../legacy/checkout-benefits.tsx";
 import { effectiveQuantity, isOrderable, loadPricedLines, type PricedLine } from "../lib/cart-products.ts";
 import { krw } from "../lib/format.ts";
 import { loginPath } from "../lib/login-path.ts";
-import { useQuote } from "../lib/use-quote.ts";
 import { type CartLine, removeFromCart, selectedCartLines } from "../state/cart.ts";
 import { useRootData } from "../state/root-data.ts";
 
@@ -62,7 +62,8 @@ function CheckoutView({ rows, direct }: { rows: PricedLine[]; direct: boolean })
   const navigate = useNavigate();
   const orderable = rows.filter(isOrderable);
   const items = orderable.map((row) => ({ productId: row.line.productId, quantity: effectiveQuantity(row) }));
-  const quote = useQuote(items);
+  const [benefits, setBenefits] = useState<Benefits>({ couponCode: "", usePoints: 0 });
+  const quote = useCheckoutQuote(items, benefits, 0);
 
   const [shipping, setShipping] = useState<ShippingInfo>({
     recipientName: user?.name ?? "",
@@ -87,6 +88,7 @@ function CheckoutView({ rows, direct }: { rows: PricedLine[]; direct: boolean })
 
   const shortageById = new Map([...(quote.status === "ready" ? quote.data.shortages : []), ...shortages].map((item) => [item.productId, item]));
   const amounts = quote.status === "ready" ? quote.data : null;
+  const benefitProblem = amounts !== null && (amounts.couponProblem !== null || amounts.pointProblem !== null);
   const blocked = shortageById.size > 0;
   const paying = pay.status === "paying";
 
@@ -100,8 +102,14 @@ function CheckoutView({ rows, direct }: { rows: PricedLine[]; direct: boolean })
   async function submit() {
     setPay({ status: "paying" });
     try {
-      const { order } = await callApi("createOrder", {
-        body: { idempotencyKey: idempotencyKey.current, items, shipping, paymentMethod: "virtual" },
+      const { order } = await checkoutOrder({
+        idempotencyKey: idempotencyKey.current,
+        items,
+        shipping,
+        paymentMethod: "virtual",
+        couponCode: benefits.couponCode,
+        usePoints: benefits.usePoints,
+        rewardPoints: amounts === null ? 0 : rewardFor(amounts.paidAmount),
       });
       if (!direct) removeFromCart(items.map((item) => item.productId));
       void navigate(`/orders/${order.id}/complete`, { replace: true });
@@ -122,7 +130,7 @@ function CheckoutView({ rows, direct }: { rows: PricedLine[]; direct: boolean })
   }
 
   const payButton = (
-    <Button size="lg" className="w-full" disabled={blocked || paying || quote.status !== "ready"} onClick={() => void submit()}>
+    <Button size="lg" className="w-full" disabled={blocked || paying || quote.status !== "ready" || benefitProblem} onClick={() => void submit()}>
       {paying ? "결제하는 중" : pay.status === "failed" ? "다시 시도" : "결제하기"}
     </Button>
   );
@@ -205,6 +213,15 @@ function CheckoutView({ rows, direct }: { rows: PricedLine[]; direct: boolean })
               })}
             </div>
           </section>
+          <BenefitsSection
+            quote={quote}
+            benefits={benefits}
+            onChange={(next) => {
+              setBenefits(next);
+              idempotencyKey.current = crypto.randomUUID();
+              setPay({ status: "idle" });
+            }}
+          />
           <section aria-labelledby="pay-title" className="border-t border-line p-4 md:p-6">
             <h2 id="pay-title" className="text-base font-extrabold text-ink">
               결제 수단
@@ -222,7 +239,7 @@ function CheckoutView({ rows, direct }: { rows: PricedLine[]; direct: boolean })
       </div>
       <aside aria-label="결제 금액" className="max-lg:hidden lg:sticky lg:top-6">
         <SummaryCard>
-          <AmountRows amounts={amounts} status={quote.status} />
+          <BenefitAmountRows quote={quote} />
           {pay.status === "failed" && <PayFailure error={pay.error} />}
           <div className="mt-6">{payButton}</div>
         </SummaryCard>
@@ -231,7 +248,7 @@ function CheckoutView({ rows, direct }: { rows: PricedLine[]; direct: boolean })
         {pay.status === "failed" && <PayFailure error={pay.error} />}
         <div className="mb-3 flex items-center justify-between">
           <span className="text-sm font-bold text-ink">결제 금액</span>
-          <span className="text-2xl leading-8 font-extrabold text-ink">{amounts !== null ? krw(amounts.total) : "-"}</span>
+          <span className="text-2xl leading-8 font-extrabold text-ink">{amounts !== null ? krw(amounts.paidAmount) : "-"}</span>
         </div>
         {payButton}
       </div>

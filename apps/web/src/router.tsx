@@ -9,7 +9,15 @@ import { CheckoutPage, checkoutLoader } from "./routes/checkout-page.tsx";
 import { HomePage, homeLoader } from "./routes/home-page.tsx";
 import { LoginPage, loginAction } from "./routes/login-page.tsx";
 import { NotFoundPage } from "./routes/not-found-page.tsx";
-import { MyOrderPage, MyOrdersPage, OrderCompletePage, myOrderLoader, myOrdersLoader } from "./routes/orders-pages.tsx";
+import { MyOrdersPage, OrderCompletePage, myOrderLoader, myOrdersLoader } from "./routes/orders-pages.tsx";
+import { AccountLayout } from "./legacy/account-layout.tsx";
+import { OrderDetailPage, orderDetailLoader } from "./legacy/order-detail-page.tsx";
+import { PointsPage, pointsLoader } from "./legacy/points-page.tsx";
+import { CouponsPage, couponsLoader } from "./legacy/coupons-page.tsx";
+import { TrackingPage, trackingLoader } from "./legacy/tracking-page.tsx";
+import { ShipmentsPage, shipmentsLoader } from "./legacy/shipments-page.tsx";
+import { MyReturnsPage, ReturnFormPage, myReturnsLoader, returnFormLoader } from "./legacy/returns-pages.tsx";
+import { NotificationsPage, notificationsLoader } from "./legacy/notifications-page.tsx";
 import { ProductPage, productLoader } from "./routes/product-page.tsx";
 import { RootError, RootFallback, logoutAction, logoutLoader, rootLoader } from "./routes/root.tsx";
 import { SearchPage, searchLoader } from "./routes/search-page.tsx";
@@ -33,8 +41,20 @@ export const routes: RouteObject[] = [
           { path: "products/:productId", element: <ProductPage />, loader: productLoader },
           { path: "cart", element: <CartPage />, loader: cartLoader },
           { path: "checkout", element: <CheckoutPage />, loader: checkoutLoader },
-          { path: "orders", element: <MyOrdersPage />, loader: myOrdersLoader },
-          { path: "orders/:orderId", element: <MyOrderPage />, loader: myOrderLoader },
+          {
+            element: <AccountLayout />,
+            children: [
+              { path: "orders", element: <MyOrdersPage />, loader: myOrdersLoader },
+              { path: "orders/:orderId", element: <OrderDetailPage />, loader: orderDetailLoader },
+              { path: "orders/:orderId/tracking", element: <TrackingPage />, loader: trackingLoader },
+              { path: "shipments", element: <ShipmentsPage />, loader: shipmentsLoader },
+              { path: "points", element: <PointsPage />, loader: pointsLoader },
+              { path: "coupons", element: <CouponsPage />, loader: couponsLoader },
+              { path: "returns", element: <MyReturnsPage />, loader: myReturnsLoader },
+              { path: "returns/new", element: <ReturnFormPage />, loader: returnFormLoader },
+              { path: "notifications", element: <NotificationsPage />, loader: notificationsLoader },
+            ],
+          },
           { path: "orders/:orderId/complete", element: <OrderCompletePage />, loader: myOrderLoader },
           { path: "login", element: <LoginPage />, action: loginAction },
           { path: "*", element: <NotFoundPage /> },

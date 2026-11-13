@@ -23,7 +23,7 @@ export default tseslint.config(
   },
   {
     // 예전 운영 시스템에서 옮겨 온 영역. 타입 없는 코드가 많아 엄격 규칙 일부를 끈다.
-    files: ["apps/api/src/{legacy,points,coupons,settlement,delivery,returns,notifications,batch,checkout}/**/*.ts"],
+    files: ["apps/api/src/{legacy,points,coupons,settlement,delivery,returns,notifications,batch,checkout}/**/*.ts", "apps/web/src/legacy/**/*.{ts,tsx}"],
     rules: {
       "@typescript-eslint/no-explicit-any": "off",
       "@typescript-eslint/no-unsafe-member-access": "off",
