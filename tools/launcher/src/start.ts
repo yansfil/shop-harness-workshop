@@ -6,7 +6,7 @@ import os from "node:os";
 import path from "node:path";
 import { parseEnv } from "node:util";
 import { capture, findHere, runVisible, spawnInteractive } from "./command.ts";
-import { checkInstalledDependencies, LockfileError } from "./dependencies.ts";
+import { checkInstalledDependencies, currentPlatform, hasReleaseFile, LockfileError } from "./dependencies.ts";
 import { claudeEnv, isInsideOrEqual, isSamePath, OBSERVER_SETTINGS_PATH, REPO_ROOT, resolvePracticeConfigDir } from "./paths.ts";
 import { runSteps, StepFailure, type Step } from "./report.ts";
 
@@ -57,9 +57,12 @@ function ensureDependencies(): string {
   console.log(`  ${state.reason}. npm ci를 실행합니다.`);
   const code = runVisible(npmPath(), ["ci"], { cwd: REPO_ROOT });
   if (code !== 0) {
-    throw new StepFailure(`npm ci가 실패했습니다(종료 코드 ${code}). 위 npm 출력을 확인하세요.`, [
-      `회사망에서 npm이 막혔다면 OS별 압축 파일(node_modules 포함)을 받아 쓰세요: ${RELEASES_URL}`,
-    ]);
+    throw new StepFailure(
+      `npm ci가 실패했습니다(종료 코드 ${code}). 위 npm 출력을 확인하세요.`,
+      hasReleaseFile(currentPlatform())
+        ? [`회사망에서 npm이 막혔다면 OS별 압축 파일(node_modules 포함)을 받아 쓰세요: ${RELEASES_URL}`]
+        : ["이 컴퓨터용 압축 파일은 없습니다. 네트워크(사내망 프록시·방화벽)를 확인한 뒤 다시 시도하세요."],
+    );
   }
   const after = checkInstalledDependencies(REPO_ROOT);
   if (!after.installed) throw new StepFailure(`npm ci가 끝났지만 설치 상태가 package-lock.json과 맞지 않습니다: ${after.reason}.`);

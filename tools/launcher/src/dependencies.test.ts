@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "nod
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { checkInstalledDependencies } from "./dependencies.ts";
+import { checkInstalledDependencies, hasReleaseFile } from "./dependencies.ts";
 
 type Packages = Record<string, Record<string, unknown>>;
 
@@ -51,20 +51,27 @@ function repoWith(wanted: Packages, installed: Packages | null, options: { witho
   return repo;
 }
 
+describe("hasReleaseFile", () => {
+  it("Release 압축 파일은 Windows x64와 Mac arm64뿐이다(D-35)", () => {
+    expect([MAC_ARM, { os: "win32", cpu: "x64" }, MAC_INTEL, { os: "linux", cpu: "x64" }, { os: "win32", cpu: "arm64" }].map(hasReleaseFile)).toEqual([true, true, false, false, false]);
+  });
+});
+
 describe("checkInstalledDependencies", () => {
   it("이 컴퓨터에 맞는 바이너리가 있고 다른 OS·CPU용·libc용·플랫폼 조건 없는 optional이 빠져 있으면 설치된 것이다", () => {
     const repo = repoWith(base, installedFor(MAC_ARM));
     expect(checkInstalledDependencies(repo, MAC_ARM)).toEqual({ installed: true, reason: "" });
   });
 
-  it("다른 CPU용 압축 파일(Intel Mac에 arm64)은 설치 안 됨이고 어느 파일을 받아야 하는지 알려 준다", () => {
+  it("Release에 압축 파일이 없는 컴퓨터(Intel Mac)는 없는 파일을 받으라고 하지 않고 npm ci로 다시 설치한다고 알린다", () => {
     const repo = repoWith(base, installedFor(MAC_ARM));
     const state = checkInstalledDependencies(repo, MAC_INTEL);
 
     expect(state.installed).toBe(false);
     expect(state.reason).toContain("Mac arm64용");
-    expect(state.reason).toContain("Mac x64용");
-    expect(state.reason).toContain("받으세요");
+    expect(state.reason).toContain("Mac x64");
+    expect(state.reason).toContain("npm ci");
+    expect(state.reason).not.toContain("받으세요");
   });
 
   it("다른 OS용 압축 파일(Mac에 Windows)도 설치 안 됨이다", () => {

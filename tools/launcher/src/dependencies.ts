@@ -89,6 +89,16 @@ function differingField(wanted: LockedPackage, installed: LockedPackage): string
   return null;
 }
 
+/** Release에 node_modules가 든 압축 파일이 있는 컴퓨터: Windows x64와 Mac arm64뿐이다(D-35). */
+const RELEASE_PLATFORMS: readonly Platform[] = [
+  { os: "win32", cpu: "x64" },
+  { os: "darwin", cpu: "arm64" },
+];
+
+export function hasReleaseFile(platform: Platform): boolean {
+  return RELEASE_PLATFORMS.some((release) => release.os === platform.os && release.cpu === platform.cpu);
+}
+
 export function currentPlatform(): Platform {
   return { os: process.platform, cpu: process.arch };
 }
@@ -117,9 +127,10 @@ export function checkInstalledDependencies(repoRoot: string, platform: Platform 
       const others = installedPlatforms(installed, platform);
       const here = describe(platform);
       if (others.length > 0) {
+        const what = `이 node_modules는 ${others.map(describe).join(", ")}용이에요. 이 컴퓨터는 ${here}이라`;
         return {
           installed: false,
-          reason: `이 node_modules는 ${others.map(describe).join(", ")}용이에요. 이 컴퓨터는 ${here}이라 ${here}용 압축 파일을 받으세요`,
+          reason: hasReleaseFile(platform) ? `${what} ${here}용 압축 파일을 받으세요` : `${what} npm ci로 이 컴퓨터용을 다시 설치해야 해요`,
         };
       }
       return { installed: false, reason: `${here}용 ${location}이 설치돼 있지 않습니다` };

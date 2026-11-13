@@ -121,18 +121,24 @@ describe("node start.mjs", () => {
       expect(fixture.npmLog()).toEqual([{ args: ["ci"], cwd: fixture.repo }]);
     });
 
-    it("이 컴퓨터용 optional 바이너리가 빠진 node_modules(다른 OS·CPU용 압축 파일)는 npm ci를 부른다", () => {
+    // libc가 지정된 optional(Linux 바이너리)은 판정하지 않는다. 그 규칙은 dependencies.test.ts가 플랫폼을 넣어 확인한다.
+    const hereBinary = Object.entries((JSON.parse(readFileSync(path.join(REPO_ROOT, "package-lock.json"), "utf8")) as { packages: Record<string, Record<string, unknown>> }).packages).find(
+      ([, entry]) =>
+        entry.optional === true &&
+        entry.libc === undefined &&
+        Array.isArray(entry.os) &&
+        Array.isArray(entry.cpu) &&
+        entry.os.includes(process.platform) &&
+        entry.cpu.includes(process.arch),
+    )?.[0];
+    it.skipIf(hereBinary === undefined)("이 컴퓨터용 optional 바이너리가 빠진 node_modules(다른 OS·CPU용 압축 파일)는 npm ci를 부른다", () => {
       fixture = createFixture();
-      const here = Object.entries(fixture.readHiddenLock().packages).find(
-        ([, entry]) => entry.optional === true && Array.isArray(entry.os) && Array.isArray(entry.cpu) && entry.os.includes(process.platform) && entry.cpu.includes(process.arch),
-      );
-      if (here === undefined) throw new Error("이 컴퓨터용 optional 바이너리가 package-lock.json에 없습니다.");
-      const missing = here[0];
+      const missing = hereBinary ?? "";
       fixture.replaceHiddenLockPackages((packages) => Object.fromEntries(Object.entries(packages).filter(([name]) => name !== missing)));
       const result = fixture.run("start.mjs", ["--check"]);
 
       expect(result.status, result.stderr).toBe(0);
-      expect(result.stdout).toContain(here[0]);
+      expect(result.stdout).toContain(missing);
       expect(result.stdout).toContain("[4/7] 의존성: 새로 설치함 (npm ci)");
       expect(fixture.npmLog()).toEqual([{ args: ["ci"], cwd: fixture.repo }]);
     });
