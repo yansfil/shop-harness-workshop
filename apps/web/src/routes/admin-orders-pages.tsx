@@ -37,7 +37,7 @@ function without<T>(set: ReadonlySet<T>, value: T): Set<T> {
 // ---- 주문 목록: 전체 주문을 필터·검색·페이지 나누기 없이 한 화면에 ----
 
 export function adminOrdersLoader() {
-  return { result: streamed(callApi("listAdminOrders")) };
+  return { result: streamed(callApi("listAdminOrders", { query: {} })) };
 }
 
 export function AdminOrdersPage() {

@@ -1,7 +1,8 @@
 import type { AdminOrderListResponse, AdminOrderResponse, OrderDetail, OrderQuoteResponse, OrderResponse } from "@grabmarket/contracts";
-import type { AdminOrderView } from "../application/admin-order-service.ts";
+import type { AdminOrderPage, AdminOrderView } from "../application/admin-order-service.ts";
 import type { Quote } from "../application/order-service.ts";
-import type { AdminOrderRow, Order } from "../domain/order.ts";
+import type { Order } from "../domain/order.ts";
+import { encodeOrderCursor } from "./order-cursor.ts";
 
 export function toOrderDetailDto(order: Order): OrderDetail {
   return {
@@ -46,9 +47,9 @@ export function toQuoteDto(quote: Quote): OrderQuoteResponse {
   };
 }
 
-export function toAdminOrderListDto(rows: AdminOrderRow[]): AdminOrderListResponse {
+export function toAdminOrderListDto(result: AdminOrderPage): AdminOrderListResponse {
   return {
-    orders: rows.map((row) => ({
+    orders: result.rows.map((row) => ({
       id: row.id,
       orderNumber: row.number,
       customerName: row.customerName,
@@ -58,6 +59,12 @@ export function toAdminOrderListDto(rows: AdminOrderRow[]): AdminOrderListRespon
       firstItemName: row.firstItemName,
       createdAt: row.createdAt.toISOString(),
     })),
+    total: result.total,
+    statusCounts: result.counts,
+    page: result.page,
+    pageSize: result.pageSize,
+    pageCount: result.pageCount,
+    nextCursor: result.after === null ? null : encodeOrderCursor(result.after),
   };
 }
 

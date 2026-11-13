@@ -70,6 +70,30 @@ export interface AdminOrderRow {
   createdAt: Date;
 }
 
+/** 관리자 주문 목록의 조건. q가 빈 문자열이면 검색 조건 없음 */
+export interface AdminOrderFilter {
+  status?: OrderStatus;
+  /** 주문번호나 고객 이름의 일부 */
+  q: string;
+}
+
+/** 목록에서 한 주문의 자리. 정렬(최신순, 같은 시각이면 id가 큰 순)이 정하는 위치라서 커서가 된다. */
+export interface OrderPosition {
+  createdAt: Date;
+  id: number;
+}
+
+/** 번호 방식(page)과 커서 방식(after: 이 자리 바로 뒤부터) */
+export type AdminOrderPaging = { kind: "page"; page: number; pageSize: number } | { kind: "after"; after: OrderPosition; pageSize: number };
+
+export type OrderStatusCounts = Record<OrderStatus, number>;
+
+export interface AdminOrderSlice {
+  rows: AdminOrderRow[];
+  /** 이 조각 뒤에 주문이 더 있는가 */
+  hasMore: boolean;
+}
+
 export interface ProductPrice {
   id: number;
   name: string;
@@ -130,7 +154,9 @@ export interface OrderRepository {
   findForCustomer(customerId: number, orderId: number): Order | undefined;
   /** 이 고객의 주문 전부, 최신순 */
   listByCustomer(customerId: number): Order[];
-  /** 전체 주문, 최신순. 필터·페이지 없음 */
-  listAll(): AdminOrderRow[];
+  /** 조건에 맞는 주문을 최신순으로 한 페이지만 */
+  listAdmin(filter: AdminOrderFilter, paging: AdminOrderPaging): AdminOrderSlice;
+  /** 상태별 주문 수. 검색어(q)만 적용하고 filter.status는 보지 않는다 */
+  countByStatus(q: string): OrderStatusCounts;
   saveStatus(orderId: number, status: OrderStatus, at: Date): void;
 }

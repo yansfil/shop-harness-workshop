@@ -146,11 +146,48 @@ export const AdminOrderRowSchema = z.object({
 });
 export type AdminOrderRow = z.infer<typeof AdminOrderRowSchema>;
 
+export const ADMIN_ORDER_PAGE_SIZE = 10;
+
 /**
- * GET /api/admin/orders (관리자). 전체 주문을 한 번에, 최신순.
- * 필터·검색·페이지 나누기는 일부러 없다(D1-A 과제). 고객이면 403 FORBIDDEN.
+ * GET /api/admin/orders?status=&q=&page=&pageSize=&cursor= (관리자). 고객이면 403 FORBIDDEN.
+ * - status: 이 상태의 주문만. 없으면 전체
+ * - q: 주문번호나 고객 이름의 일부(대소문자 무시, 앞뒤 공백은 지운다). 빈 문자열은 조건 없음
+ * - 페이지 나누기는 두 방식이다. 같은 정렬(최신순, 같은 시각이면 id가 큰 순)을 쓴다.
+ *   번호 방식: page(1부터). 화면이 쓴다.
+ *   커서 방식: 앞 응답의 nextCursor를 cursor로 보낸다. 건너뛰기 없이 앞 응답이 끝난 자리부터 이어 준다. cursor가 있으면 page는 무시한다.
  */
-export const AdminOrderListResponseSchema = z.object({ orders: z.array(AdminOrderRowSchema) });
+export const AdminOrderListQuerySchema = z.object({
+  status: OrderStatusSchema.optional(),
+  q: z.string().trim().max(50).optional(),
+  page: z.coerce.number().int().positive().default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(ADMIN_ORDER_PAGE_SIZE),
+  cursor: z.string().min(1).max(100).optional(),
+});
+export type AdminOrderListQuery = z.infer<typeof AdminOrderListQuerySchema>;
+/** 화면이 쿼리 문자열을 만들 때 쓰는 입력 모양 */
+export type AdminOrderListInput = z.input<typeof AdminOrderListQuerySchema>;
+
+export const AdminOrderListResponseSchema = z.object({
+  /** 이 페이지의 주문 */
+  orders: z.array(AdminOrderRowSchema),
+  /** status·q 조건에 맞는 주문 전체 수 */
+  total: z.number().int().nonnegative(),
+  /** 상태 칩의 개수: status 조건만 빼고 q 조건은 적용한 개수. 네 상태와 전체가 항상 모두 들어 있다(0개 포함) */
+  statusCounts: z.object({
+    all: z.number().int().nonnegative(),
+    paid: z.number().int().nonnegative(),
+    preparing: z.number().int().nonnegative(),
+    shipping: z.number().int().nonnegative(),
+    delivered: z.number().int().nonnegative(),
+  }),
+  /** 번호 방식이면 지금 페이지, 커서 방식이면 null */
+  page: z.number().int().positive().nullable(),
+  pageSize: z.number().int().positive(),
+  /** 전체 페이지 수. 조건에 맞는 주문이 없으면 0 */
+  pageCount: z.number().int().nonnegative(),
+  /** 다음 페이지를 이어 받을 커서. 마지막 페이지면 null */
+  nextCursor: z.string().nullable(),
+});
 export type AdminOrderListResponse = z.infer<typeof AdminOrderListResponseSchema>;
 
 export const AdminOrderDetailSchema = OrderDetailSchema.extend({

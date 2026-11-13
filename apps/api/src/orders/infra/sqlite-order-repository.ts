@@ -2,7 +2,16 @@ import type { Database } from "@grabmarket/db";
 import { won } from "@grabmarket/shared";
 import { selectAll } from "../../shared/infra/rows.ts";
 import { INITIAL_ORDER_STATUS, type OrderStatus } from "../domain/order-status.ts";
-import type { AdminOrderRow, NewOrder, Order, OrderRepository, PricedLine } from "../domain/order.ts";
+import type {
+  AdminOrderFilter,
+  AdminOrderPaging,
+  AdminOrderSlice,
+  NewOrder,
+  Order,
+  OrderRepository,
+  OrderStatusCounts,
+  PricedLine,
+} from "../domain/order.ts";
 
 interface OrderRow {
   id: number;
@@ -37,6 +46,18 @@ const ORDER_SELECT = `
          o.subtotal, o.shipping_fee, o.total, o.payment_method,
          o.recipient_name, o.recipient_phone, o.shipping_address, o.created_at, o.updated_at
     FROM orders o JOIN users u ON u.id = o.customer_id`;
+
+function where(conditions: string[]): string {
+  return conditions.length === 0 ? "" : `WHERE ${conditions.join(" AND ")}`;
+}
+
+/** 주문번호나 고객 이름에 q가 들어 있는 주문. LIKE의 와일드카드(%, _)는 글자 그대로 찾는다. */
+function addSearch(q: string, conditions: string[], params: (string | number)[]): void {
+  if (q === "") return;
+  const pattern = `%${q.replace(/[\\%_]/g, "\\$&")}%`;
+  conditions.push("(o.order_number LIKE ? ESCAPE '\\' OR u.name LIKE ? ESCAPE '\\')");
+  params.push(pattern, pattern);
+}
 
 export class SqliteOrderRepository implements OrderRepository {
   readonly #db: Database;
@@ -102,24 +123,61 @@ export class SqliteOrderRepository implements OrderRepository {
     return this.#hydrate(selectAll<OrderRow>(this.#db, `${ORDER_SELECT} WHERE o.customer_id = ? ORDER BY o.created_at DESC, o.id DESC`, customerId));
   }
 
-  listAll(): AdminOrderRow[] {
-    return selectAll<{ id: number; order_number: string; customer_name: string; status: OrderStatus; total: number; item_count: number; first_item_name: string; created_at: string }>(
+  listAdmin(filter: AdminOrderFilter, paging: AdminOrderPaging): AdminOrderSlice {
+    const conditions: string[] = [];
+    const params: (string | number)[] = [];
+    if (filter.status !== undefined) {
+      conditions.push("o.status = ?");
+      params.push(filter.status);
+    }
+    addSearch(filter.q, conditions, params);
+    if (paging.kind === "after") {
+      const at = paging.after.createdAt.toISOString();
+      conditions.push("(o.created_at < ? OR (o.created_at = ? AND o.id < ?))");
+      params.push(at, at, paging.after.id);
+    }
+    const offset = paging.kind === "page" ? (paging.page - 1) * paging.pageSize : 0;
+    // 한 줄 더 읽어서 뒤에 주문이 남았는지 안다.
+    const rows = selectAll<{ id: number; order_number: string; customer_name: string; status: OrderStatus; total: number; item_count: number; first_item_name: string; created_at: string }>(
       this.#db,
       `SELECT o.id, o.order_number, u.name AS customer_name, o.status, o.total, o.created_at,
               (SELECT COUNT(*) FROM order_items i WHERE i.order_id = o.id) AS item_count,
               (SELECT i.product_name FROM order_items i WHERE i.order_id = o.id ORDER BY i.id LIMIT 1) AS first_item_name
          FROM orders o JOIN users u ON u.id = o.customer_id
-        ORDER BY o.created_at DESC, o.id DESC`,
-    ).map((row) => ({
-      id: row.id,
-      number: row.order_number,
-      customerName: row.customer_name,
-      status: row.status,
-      total: won(row.total),
-      itemCount: row.item_count,
-      firstItemName: row.first_item_name,
-      createdAt: new Date(row.created_at),
-    }));
+        ${where(conditions)}
+        ORDER BY o.created_at DESC, o.id DESC
+        LIMIT ? OFFSET ?`,
+      ...params,
+      paging.pageSize + 1,
+      offset,
+    );
+    return {
+      hasMore: rows.length > paging.pageSize,
+      rows: rows.slice(0, paging.pageSize).map((row) => ({
+        id: row.id,
+        number: row.order_number,
+        customerName: row.customer_name,
+        status: row.status,
+        total: won(row.total),
+        itemCount: row.item_count,
+        firstItemName: row.first_item_name,
+        createdAt: new Date(row.created_at),
+      })),
+    };
+  }
+
+  countByStatus(q: string): OrderStatusCounts {
+    const conditions: string[] = [];
+    const params: string[] = [];
+    addSearch(q, conditions, params);
+    const counts: OrderStatusCounts = { paid: 0, preparing: 0, shipping: 0, delivered: 0 };
+    const rows = selectAll<{ status: OrderStatus; count: number }>(
+      this.#db,
+      `SELECT o.status, COUNT(*) AS count FROM orders o JOIN users u ON u.id = o.customer_id ${where(conditions)} GROUP BY o.status`,
+      ...params,
+    );
+    for (const row of rows) counts[row.status] = row.count;
+    return counts;
   }
 
   saveStatus(orderId: number, status: OrderStatus, at: Date): void {
