@@ -35,6 +35,7 @@ function isCommitted(relative, cwd) {
  */
 function migrationPath(target, cwd, projectRoot) {
   const slashed = toSlash(target);
+  if (slashed === "") return null;
   const name = slashed.split("/").pop();
   if (cwd === null && !path.isAbsolute(slashed)) return MIGRATION_NAME.test(name) ? `${MIGRATIONS_DIR}/${name}` : null;
   const relative = toSlash(path.relative(projectRoot, path.resolve(cwd, slashed)));
@@ -47,7 +48,7 @@ function migrationPath(target, cwd, projectRoot) {
 const ENV_REASON =
   ".env는 읽거나 고칠 수 없습니다. 환경 변수의 키 목록은 apps/api/src/config.ts의 ENV_REGISTRY와 .env.example에 있고, 값은 사람이 직접 바꿉니다.";
 const migrationReason = (relative) =>
-  `이미 있는 마이그레이션(${relative})은 고칠 수 없습니다. 적용된 노트북의 DB와 스키마가 달라집니다. ${MIGRATIONS_DIR}/에 다음 번호 파일(예: 0002_이름.sql)을 새로 만드세요.`;
+  `이미 있는 마이그레이션(${relative === MIGRATIONS_DIR ? `${MIGRATIONS_DIR}의 기존 파일` : relative})은 고칠 수 없습니다. 적용된 노트북의 DB와 스키마가 달라집니다. ${MIGRATIONS_DIR}/에 다음 번호 파일(예: 0002_이름.sql)을 새로 만드세요.`;
 
 function checkMigrations(candidates, projectRoot, committed) {
   for (const relative of new Set(candidates.filter((candidate) => candidate !== null))) {

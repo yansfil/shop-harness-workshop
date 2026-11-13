@@ -158,8 +158,10 @@ describe("protect-files", () => {
       expect(protectFiles(bash("echo x >> packages/db/migrations/0002_new.sql"), repo.dir)).toBeNull();
     });
 
-    it("HEAD에 있는 번호 파일은 막는다", () => {
+    it("HEAD에 있는 번호 파일은 막고, 막은 이유에 그 파일을 적는다", () => {
       expect(denied(protectFiles(file("Edit", "packages/db/migrations/0001_init.sql"), repo.dir))).toBe(true);
+      const output = protectFiles(bash("cd packages/db/migrations && sed -i '' 's/a/b/' 0001_init.sql"), repo.dir);
+      expect(output.hookSpecificOutput.permissionDecisionReason).toContain("packages/db/migrations/0001_init.sql");
     });
   });
 });
