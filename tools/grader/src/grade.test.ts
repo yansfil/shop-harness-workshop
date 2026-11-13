@@ -188,8 +188,62 @@ describe("규칙 7 기존 테스트 expect 변경", () => {
   it("Supertest 체인의 .expect(상태 코드)를 바꾸면 위반", () => {
     const original = ['it("create", async () => {', '  const response = await request(app).post("/api/orders").send(body).expect(201);', "  await request(app).get(\"/api/orders\").expect(200);", "  return response;", "});", ""].join("\n");
     const root = repoAtStart({ [TEST]: original });
-    write(root, { [TEST]: original.replace(".expect(201)", ".expect(200)").replace(".expect(200);\n  return", ".expect(404);\n  return") });
+    write(root, { [TEST]: original.replace(".expect(201)", ".expect(500)").replace(".expect(200);\n  return", ".expect(404);\n  return") });
     expect(found(gradeSinceStart(root))).toEqual([`test-expect-change ${TEST}:2`, `test-expect-change ${TEST}:3`]);
+  });
+
+  const CASES = [
+    'describe("주문", () => {',
+    '  it("주문하면 재고가 준다", async () => {',
+    "    const created = await customer.post(ROUTES.orders).send(body).expect(201);",
+    "    const { order } = OrderResponseSchema.parse(created.body);",
+    '    expect(order.status).toBe("paid");',
+    "    expect(await stockOf(admin, PRODUCT.tangerine)).toBe(8);",
+    "  });",
+    '  it("모자라면 거절한다", async () => {',
+    "    await customer.post(ROUTES.orders).send(body).expect(409);",
+    "    expect(await stockOf(admin, PRODUCT.tangerine)).toBe(10);",
+    "  });",
+    "});",
+    "",
+  ].join("\n");
+
+  it("Supertest 응답 변수 이름만 바꾸면 통과(.expect(201)은 그대로)", () => {
+    const root = repoAtStart({ [TEST]: CASES });
+    write(root, { [TEST]: CASES.replace("const created =", "const createdResponse =").replace("parse(created.body)", "parse(createdResponse.body)") });
+    expect(found(gradeSinceStart(root))).toEqual([]);
+  });
+
+  it("두 테스트의 기대값을 서로 바꾸면 두 테스트 모두 위반", () => {
+    const root = repoAtStart({ [TEST]: CASES });
+    write(root, { [TEST]: CASES.replace(".toBe(8)", ".toBe(__TEN__)").replace(".toBe(10)", ".toBe(8)").replace("__TEN__", "10") });
+    expect(found(gradeSinceStart(root))).toEqual([`test-expect-change ${TEST}:6`, `test-expect-change ${TEST}:10`]);
+  });
+
+  it("같은 테스트 안에서 기존 기대의 순서를 바꾸면 위반", () => {
+    const root = repoAtStart({ [TEST]: CASES });
+    const lines = CASES.split("\n");
+    [lines[4], lines[5]] = [lines[5] ?? "", lines[4] ?? ""];
+    write(root, { [TEST]: lines.join("\n") });
+    expect(found(gradeSinceStart(root))).toHaveLength(1);
+  });
+
+  it("기존 테스트 안에 새 기대를 끼워 넣으면 통과", () => {
+    const root = repoAtStart({ [TEST]: CASES });
+    write(root, { [TEST]: CASES.replace('    expect(order.status).toBe("paid");\n', '    expect(order.status).toBe("paid");\n    expect(order.total).toBeGreaterThan(0);\n') });
+    expect(found(gradeSinceStart(root))).toEqual([]);
+  });
+
+  it("테스트 제목을 바꾸면(케이스가 사라지면) 그 테스트의 기대 전부가 위반", () => {
+    const root = repoAtStart({ [TEST]: CASES });
+    write(root, { [TEST]: CASES.replace("모자라면 거절한다", "모자라도 괜찮다") });
+    expect(found(gradeSinceStart(root))).toEqual([`test-expect-change ${TEST}:9`, `test-expect-change ${TEST}:10`]);
+  });
+
+  it("기존 기대를 맨 뒤로 옮기면 옮긴 하나만 위반", () => {
+    const root = repoAtStart({ [TEST]: CASES });
+    write(root, { [TEST]: CASES.replace('    expect(order.status).toBe("paid");\n', "").replace("toBe(8);\n", 'toBe(8);\n    expect(order.status).toBe("paid");\n') });
+    expect(found(gradeSinceStart(root))).toEqual([`test-expect-change ${TEST}:5`]);
   });
 
   it("기존 테스트 파일을 지우면 위반", () => {

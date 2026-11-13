@@ -248,31 +248,82 @@ export function isMigrationFile(file: string): boolean {
   return /^packages\/db\/migrations\/[^/]+$/.test(file);
 }
 
-export interface ExpectStatement {
-  /** 문장의 첫 줄(1부터). */
+/** 기대 하나: vitest의 expect(...)부터 매처 사슬 끝까지, 또는 Supertest 체인의 .expect(...) 호출과 인자. */
+export interface Expectation {
+  /** 기대가 시작하는 줄(1부터). */
   line: number;
-  statement: string;
+  /** 파일 안 위치. 같은 줄의 기대끼리 순서를 정한다. */
+  position: number;
+  /** 토큰으로 정규화한 기대. 줄바꿈·들여쓰기·주석만 바뀌면 같다. */
+  text: string;
 }
 
-/** 기대를 적는 호출: vitest의 expect(...)와 Supertest 체인의 .expect(...). */
-function isExpectCall(node: ts.Node): boolean {
-  if (!ts.isCallExpression(node)) return false;
-  const callee = node.expression;
-  return (ts.isIdentifier(callee) && callee.text === "expect") || (ts.isPropertyAccessExpression(callee) && callee.name.text === "expect");
+/** 테스트 케이스(describe·it 제목 경로)마다 그 안의 기대를 나온 순서대로. */
+export interface TestCase {
+  title: string;
+  expectations: Expectation[];
+}
+
+const SUITE_FUNCTIONS = new Set(["describe", "it", "test"]);
+const CASE_FUNCTIONS = new Set(["it", "test"]);
+/** 테스트 케이스 밖(파일 위의 도우미 함수, beforeEach 등)의 기대가 들어가는 이름. */
+const OUTSIDE_CASES = "(테스트 케이스 밖)";
+
+/** describe(...)·it.only(...)·test.skip(...) 같은 호출이면 그 이름(describe·it·test). */
+function suiteFunction(node: ts.CallExpression): string | null {
+  const callee = ts.isPropertyAccessExpression(node.expression) ? node.expression.expression : node.expression;
+  return ts.isIdentifier(callee) && SUITE_FUNCTIONS.has(callee.text) ? callee.text : null;
+}
+
+/** vitest 기대의 끝: expect(a)에서 .not.toBe(b)처럼 이어지는 사슬의 맨 바깥 노드. */
+function chainEnd(node: ts.Node): ts.Node {
+  let current = node;
+  while ((ts.isPropertyAccessExpression(current.parent) || ts.isCallExpression(current.parent)) && current.parent.expression === current) current = current.parent;
+  return current;
 }
 
 /**
- * 테스트 파일에서 기대 호출이 든 문장. expect(a).toBe(b), await expect(p).rejects...,
- * const response = await request(app).post(...).expect(201) 처럼 여러 줄에 걸친 문장 전체를 하나로 본다.
+ * 테스트 파일의 테스트 케이스와 그 기대들. 같은 제목 경로가 또 나오면 뒤에 (2), (3)을 붙인다.
+ * 기대 식만 비교하므로 응답 변수 이름처럼 기대 밖의 코드가 바뀌어도 같고, 다른 테스트의 같은 기대와는 섞이지 않는다.
  */
-export function expectStatements(file: string, content: string): ExpectStatement[] {
+export function testCases(file: string, content: string): TestCase[] {
   const source = parse(file, content);
-  const found: ExpectStatement[] = [];
-  // it(...) 안의 함수 몸통으로는 들어가지 않는다. 그 안의 문장은 따로 하나씩 센다.
-  const hasExpect = (inner: ts.Node): boolean => !ts.isFunctionLike(inner) && (isExpectCall(inner) || (ts.forEachChild(inner, hasExpect) ?? false));
-  walk(source, (node) => {
-    if (!(ts.isExpressionStatement(node) || ts.isVariableStatement(node) || ts.isReturnStatement(node))) return;
-    if (ts.forEachChild(node, hasExpect) ?? false) found.push({ line: lineOf(source, node), statement: statementTokens(source, node) });
-  });
-  return found;
+  const cases = new Map<string, TestCase>();
+  const caseFor = (title: string): TestCase => {
+    let found = cases.get(title);
+    if (found === undefined) {
+      found = { title, expectations: [] };
+      cases.set(title, found);
+    }
+    return found;
+  };
+  const visit = (node: ts.Node, path: readonly string[], inCase: boolean): void => {
+    if (ts.isCallExpression(node)) {
+      const suite = suiteFunction(node);
+      const [titleNode, ...rest] = node.arguments;
+      if (suite !== null && titleNode !== undefined) {
+        const isCase = CASE_FUNCTIONS.has(suite);
+        const name = ts.isStringLiteralLike(titleNode) ? titleNode.text : statementTokens(source, titleNode);
+        let segment = name;
+        for (let count = 2; isCase && cases.has([...path, segment].join(" › ")); count += 1) segment = `${name} (${String(count)})`;
+        if (isCase) caseFor([...path, segment].join(" › "));
+        for (const argument of rest) visit(argument, [...path, segment], inCase || isCase);
+        return;
+      }
+      const callee = node.expression;
+      const owner = inCase ? path.join(" › ") : [...path, OUTSIDE_CASES].join(" › ");
+      if (ts.isIdentifier(callee) && callee.text === "expect") {
+        caseFor(owner).expectations.push({ line: lineOf(source, node), position: node.getStart(source), text: statementTokens(source, chainEnd(node)) });
+      } else if (ts.isPropertyAccessExpression(callee) && callee.name.text === "expect") {
+        const args = node.arguments.map((argument) => statementTokens(source, argument)).join(" , ");
+        caseFor(owner).expectations.push({ line: lineOf(source, callee.name), position: callee.name.getStart(source), text: `. expect ( ${args} )` });
+      }
+    }
+    ts.forEachChild(node, (child) => {
+      visit(child, path, inCase);
+    });
+  };
+  visit(source, [], false);
+  for (const testCase of cases.values()) testCase.expectations.sort((a, b) => a.position - b.position);
+  return [...cases.values()];
 }
