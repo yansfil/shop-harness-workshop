@@ -3,7 +3,7 @@ import type { CatalogService } from "../../catalog/application/catalog-service.t
 import type { InventoryService } from "../../inventory/application/inventory-service.ts";
 import { InsufficientStockError, type StockLine, type StockShortage } from "../../inventory/domain/stock.ts";
 import type { UnitOfWork } from "../../shared/application/unit-of-work.ts";
-import { DomainError } from "../../shared/domain/domain-error.ts";
+import { DomainError, notFound } from "../../shared/domain/domain-error.ts";
 import type { SessionUser } from "../../shared/domain/session-user.ts";
 import {
   type CartLine,
@@ -79,6 +79,18 @@ export class OrderService {
       if (shortages.length > 0) throw new InsufficientStockError(shortages);
       return { created: true, order };
     });
+  }
+
+  /** 이 고객의 주문 전부, 최신순 */
+  listForCustomer(customerId: number): Order[] {
+    return this.#orders.listByCustomer(customerId);
+  }
+
+  /** 이 고객의 주문 한 건. 남의 주문이거나 없으면 NotFound(주문이 있다는 사실도 드러내지 않는다). */
+  getForCustomer(customerId: number, orderId: number): Order {
+    const order = this.#orders.findForCustomer(customerId, orderId);
+    if (order === undefined) throw notFound("주문");
+    return order;
   }
 
   #price(lines: CartLine[]): PricedOrder {

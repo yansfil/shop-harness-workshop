@@ -1,4 +1,4 @@
-import type { AdminOrderListResponse, AdminOrderResponse, OrderDetail, OrderQuoteResponse, OrderResponse } from "@grabmarket/contracts";
+import type { AdminOrderListResponse, AdminOrderResponse, OrderDetail, OrderQuoteResponse, OrderResponse, OrderSummary } from "@grabmarket/contracts";
 import type { AdminOrderView } from "../application/admin-order-service.ts";
 import type { Quote } from "../application/order-service.ts";
 import type { AdminOrderRow, Order } from "../domain/order.ts";
@@ -28,6 +28,22 @@ export function toOrderDetailDto(order: Order): OrderDetail {
 
 export function toOrderResponse(order: Order): OrderResponse {
   return { order: toOrderDetailDto(order) };
+}
+
+/** 내 주문 목록의 한 줄 */
+export function toOrderSummaryDto(order: Order): OrderSummary {
+  const [first] = order.items;
+  if (first === undefined) throw new Error(`주문 ${order.number}에 품목이 없습니다`);
+  return {
+    id: order.id,
+    orderNumber: order.number,
+    status: order.status,
+    total: order.total,
+    itemCount: order.items.length,
+    firstItemName: first.productName,
+    firstItemImageUrl: first.imagePath,
+    createdAt: order.createdAt.toISOString(),
+  };
 }
 
 export function toQuoteDto(quote: Quote): OrderQuoteResponse {
