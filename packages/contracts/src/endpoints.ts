@@ -10,6 +10,7 @@ import {
   CancelOrderRequestSchema,
   CreateOrderRequestSchema,
   MyOrderListResponseSchema,
+  MyOrderResponseSchema,
   OrderParamsSchema,
   OrderQuoteRequestSchema,
   OrderQuoteResponseSchema,
@@ -47,7 +48,7 @@ export const ENDPOINTS = {
   quoteOrder: { method: "POST", path: ROUTES.orderQuote, access: "public", body: OrderQuoteRequestSchema, response: OrderQuoteResponseSchema },
   createOrder: { method: "POST", path: ROUTES.orders, access: "customer", body: CreateOrderRequestSchema, response: OrderResponseSchema },
   listMyOrders: { method: "GET", path: ROUTES.orders, access: "customer", response: MyOrderListResponseSchema },
-  getMyOrder: { method: "GET", path: ROUTES.order, access: "customer", params: OrderParamsSchema, response: OrderResponseSchema },
+  getMyOrder: { method: "GET", path: ROUTES.order, access: "customer", params: OrderParamsSchema, response: MyOrderResponseSchema },
   cancelOrder: { method: "POST", path: ROUTES.orderCancel, access: "customer", params: OrderParamsSchema, body: CancelOrderRequestSchema, response: OrderResponseSchema },
 
   listAdminOrders: { method: "GET", path: ROUTES.adminOrders, access: "admin", response: AdminOrderListResponseSchema },

@@ -18,7 +18,7 @@ const productRows = () =>
     .getAllByRole("link")
     .filter((link) => link.getAttribute("href")?.startsWith("/products/"));
 
-describe("검색창을 눌렀을 때 (B44)", () => {
+describe("검색창을 눌렀을 때", () => {
   it("최근 검색어를 보이고 하나씩 지울 수 있다", async () => {
     await focusSearch("/", { recent: ["감귤", "수건 3장", "쌀 2kg"] });
 
@@ -63,7 +63,7 @@ describe("검색창을 눌렀을 때 (B44)", () => {
   });
 });
 
-describe("글자를 칠 때 자동완성 (B48)", () => {
+describe("글자를 칠 때 자동완성", () => {
   it("이름이 일치하는 상품을 최대 8줄 보이고 친 글자를 굵게 강조한다", async () => {
     const { input } = await focusSearch();
 
