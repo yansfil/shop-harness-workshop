@@ -24,6 +24,8 @@ function tempRepo(files) {
   git("init", "-q");
   git("config", "user.email", "test@example.com");
   git("config", "user.name", "test");
+  // 전역 설정의 커밋 서명(commit.gpgsign)이 켜져 있으면 키 에이전트 없이 커밋이 실패하므로 끈다.
+  git("config", "commit.gpgsign", "false");
   for (const [name, text] of Object.entries(files)) {
     mkdirSync(path.dirname(path.join(dir, name)), { recursive: true });
     writeFileSync(path.join(dir, name), text);
