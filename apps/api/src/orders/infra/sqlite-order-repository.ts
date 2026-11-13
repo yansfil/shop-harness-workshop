@@ -2,7 +2,7 @@ import type { Database } from "@grabmarket/db";
 import { won } from "@grabmarket/shared";
 import { selectAll } from "../../shared/infra/rows.ts";
 import { INITIAL_ORDER_STATUS, type OrderStatus } from "../domain/order-status.ts";
-import type { AdminOrderRow, NewOrder, Order, OrderRepository, PricedLine } from "../domain/order.ts";
+import type { AdminOrderRow, NewOrder, Order, OrderCancellation, OrderRepository, PricedLine } from "../domain/order.ts";
 
 interface OrderRow {
   id: number;
@@ -122,6 +122,12 @@ export class SqliteOrderRepository implements OrderRepository {
 
   saveStatus(orderId: number, status: OrderStatus, at: Date): void {
     this.#db.prepare("UPDATE orders SET status = ?, updated_at = ? WHERE id = ?").run(status, at.toISOString(), orderId);
+  }
+
+  insertCancellation(cancellation: OrderCancellation): void {
+    this.#db
+      .prepare("INSERT INTO order_cancellations (order_id, customer_id, reason, previous_status, created_at) VALUES (?, ?, ?, ?, ?)")
+      .run(cancellation.orderId, cancellation.customerId, cancellation.reason, cancellation.previousStatus, cancellation.at.toISOString());
   }
 
   #hydrateOne(rows: OrderRow[]): Order | undefined {

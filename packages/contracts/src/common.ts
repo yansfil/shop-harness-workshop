@@ -33,6 +33,8 @@ export const ErrorCodeSchema = z.enum([
   "INVALID_STATUS_TRANSITION",
   /** 409 같은 멱등 키로 다른 내용의 요청을 보냈다. */
   "IDEMPOTENCY_KEY_REUSED",
+  /** 409 결제완료·배송준비가 아닌 주문을 취소하려 했다. */
+  "ORDER_NOT_CANCELLABLE",
   /** 500 서버 오류. 자세한 내용은 서버 로그에만 남는다. */
   "INTERNAL_ERROR",
 ]);

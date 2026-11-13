@@ -14,6 +14,7 @@ export const ROUTES = {
   orderQuote: "/api/orders/quote",
   orders: "/api/orders",
   order: "/api/orders/:orderId",
+  orderCancel: "/api/orders/:orderId/cancel",
 
   adminOrders: "/api/admin/orders",
   adminOrder: "/api/admin/orders/:orderId",

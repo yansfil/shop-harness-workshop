@@ -1,7 +1,7 @@
-import { CreateOrderRequestSchema, OrderQuoteRequestSchema, ROUTES } from "@grabmarket/contracts";
+import { CancelOrderRequestSchema, CreateOrderRequestSchema, OrderParamsSchema, OrderQuoteRequestSchema, ROUTES } from "@grabmarket/contracts";
 import type { Router } from "express";
 import type { Controller } from "../../shared/web/controller.ts";
-import { requireUser } from "../../shared/web/session.ts";
+import { requireCustomer, requireUser } from "../../shared/web/session.ts";
 import type { OrderService } from "../application/order-service.ts";
 import { toOrderResponse, toQuoteDto } from "./order-mapper.ts";
 
@@ -24,6 +24,13 @@ export class OrderController implements Controller {
       const input = CreateOrderRequestSchema.parse(req.body);
       const placed = this.#orders.place(buyer, input);
       res.status(placed.created ? 201 : 200).json(toOrderResponse(placed.order));
+    });
+
+    router.post(ROUTES.orderCancel, (req, res) => {
+      const buyer = requireCustomer(res);
+      const { orderId } = OrderParamsSchema.parse(req.params);
+      const { reason } = CancelOrderRequestSchema.parse(req.body ?? {});
+      res.json(toOrderResponse(this.#orders.cancel(buyer, orderId, reason ?? null)));
     });
   }
 }

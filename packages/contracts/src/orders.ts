@@ -1,8 +1,8 @@
 import { z } from "zod";
 import { DateTimeSchema, IdempotencyKeySchema, IdSchema, MoneySchema, StockShortageSchema } from "./common.ts";
 
-/** 주문 상태. 다음 단계로만 넘어간다: paid → preparing → shipping → delivered */
-export const OrderStatusSchema = z.enum(["paid", "preparing", "shipping", "delivered"]);
+/** 주문 상태. 다음 단계로만 넘어간다: paid → preparing → shipping → delivered. 결제완료·배송준비에서는 cancelled로 취소할 수 있다. */
+export const OrderStatusSchema = z.enum(["paid", "preparing", "shipping", "delivered", "cancelled"]);
 export type OrderStatus = z.infer<typeof OrderStatusSchema>;
 
 /** 화면 표기와 순서 */
@@ -11,6 +11,7 @@ export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
   preparing: "배송준비",
   shipping: "배송중",
   delivered: "배송완료",
+  cancelled: "취소됨",
 };
 
 /** 결제 수단은 하나뿐이다. 화면 표기: "교육용 가상 결제" */
@@ -169,3 +170,10 @@ export type AdminOrderResponse = z.infer<typeof AdminOrderResponseSchema>;
  */
 export const ChangeOrderStatusRequestSchema = z.object({ status: OrderStatusSchema });
 export type ChangeOrderStatusRequest = z.infer<typeof ChangeOrderStatusRequestSchema>;
+
+/**
+ * POST /api/orders/:orderId/cancel (고객) → OrderResponseSchema. 결제완료·배송준비인 내 주문을 취소됨으로 바꾸고 재고를 되돌린다.
+ * 이미 취소된 주문이면 바꾸지 않고 200. 배송중부터는 409 ORDER_NOT_CANCELLABLE, 남의 주문이면 404 NOT_FOUND.
+ */
+export const CancelOrderRequestSchema = z.object({ reason: z.string().trim().max(200).optional() });
+export type CancelOrderRequest = z.infer<typeof CancelOrderRequestSchema>;

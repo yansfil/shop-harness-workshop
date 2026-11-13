@@ -132,4 +132,18 @@ export interface OrderRepository {
   /** 전체 주문, 최신순. 필터·페이지 없음 */
   listAll(): AdminOrderRow[];
   saveStatus(orderId: number, status: OrderStatus, at: Date): void;
+  insertCancellation(cancellation: OrderCancellation): void;
+}
+
+export interface OrderCancellation {
+  orderId: number;
+  customerId: number;
+  previousStatus: OrderStatus;
+  reason: string | null;
+  at: Date;
+}
+
+/** 취소된 주문의 후속 처리(결제 환불·쿠폰·포인트 되돌리기). 조립 파일이 구현을 넘긴다. */
+export interface OrderCancelListener {
+  orderCancelled(order: Order, at: Date): void;
 }

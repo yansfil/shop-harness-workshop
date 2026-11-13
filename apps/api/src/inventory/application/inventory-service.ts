@@ -85,6 +85,30 @@ export class InventoryService {
     });
   }
 
+  /** 취소·반품으로 돌아온 수량을 되돌린다. 주문 번호와 사유를 이력에 남긴다. 주문 트랜잭션 안에서 부른다. */
+  restoreForOrder(orderId: number, lines: StockLine[], memo: string): void {
+    this.#uow.run(() => {
+      const quantities = this.#inventory.quantities(lines.map((line) => line.productId));
+      const at = this.#clock.now();
+      for (const line of lines) {
+        const after = (quantities.get(line.productId) ?? 0) + line.quantity;
+        quantities.set(line.productId, after);
+        this.#inventory.setQuantity(line.productId, after, at);
+        this.#inventory.insertMovement({
+          productId: line.productId,
+          kind: "inbound",
+          quantityDelta: line.quantity,
+          quantityAfter: after,
+          orderId,
+          memo,
+          idempotencyKey: null,
+          createdBy: null,
+          createdAt: at,
+        });
+      }
+    });
+  }
+
   /** 입고를 등록한다. 같은 키로 다시 보내면 수량을 다시 늘리지 않고 처음 결과를 돌려준다. */
   registerInbound(admin: SessionUser, productId: number, request: InboundRequest): InboundResult {
     return this.#uow.run(() => {

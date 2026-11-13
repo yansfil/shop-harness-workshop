@@ -3,19 +3,21 @@ import type { CatalogService } from "../../catalog/application/catalog-service.t
 import type { InventoryService } from "../../inventory/application/inventory-service.ts";
 import { InsufficientStockError, type StockLine, type StockShortage } from "../../inventory/domain/stock.ts";
 import type { UnitOfWork } from "../../shared/application/unit-of-work.ts";
-import { DomainError } from "../../shared/domain/domain-error.ts";
+import { DomainError, notFound } from "../../shared/domain/domain-error.ts";
 import type { SessionUser } from "../../shared/domain/session-user.ts";
 import {
   type CartLine,
   formatOrderNumber,
   isSameRequest,
   type Order,
+  type OrderCancelListener,
   type OrderRepository,
   orderDayKey,
   type PlaceOrderInput,
   priceOrder,
   type PricedOrder,
 } from "../domain/order.ts";
+import { cancelStatus } from "../domain/order-status.ts";
 
 export interface Quote extends PricedOrder {
   shortages: StockShortage[];
@@ -33,13 +35,22 @@ export class OrderService {
   readonly #inventory: InventoryService;
   readonly #uow: UnitOfWork;
   readonly #clock: Clock;
+  readonly #cancelListeners: OrderCancelListener[];
 
-  constructor(orders: OrderRepository, catalog: CatalogService, inventory: InventoryService, uow: UnitOfWork, clock: Clock) {
+  constructor(
+    orders: OrderRepository,
+    catalog: CatalogService,
+    inventory: InventoryService,
+    uow: UnitOfWork,
+    clock: Clock,
+    cancelListeners: OrderCancelListener[] = [],
+  ) {
     this.#orders = orders;
     this.#catalog = catalog;
     this.#inventory = inventory;
     this.#uow = uow;
     this.#clock = clock;
+    this.#cancelListeners = cancelListeners;
   }
 
   /** 장바구니 금액 미리 보기. 재고가 모자라도 오류가 아니라 shortages로 알린다. */
@@ -78,6 +89,27 @@ export class OrderService {
       const shortages = this.#inventory.decreaseForOrder(order.id, stockLines(priced));
       if (shortages.length > 0) throw new InsufficientStockError(shortages);
       return { created: true, order };
+    });
+  }
+
+  /**
+   * 내 주문을 취소한다: 상태 전이(결제완료·배송준비만) → 재고 되돌리기 → 후속 처리, 모두 한 트랜잭션.
+   * 이미 취소된 주문이면 아무것도 바꾸지 않고 그대로 돌려준다(다시 보내도 같은 결과).
+   */
+  cancel(buyer: SessionUser, orderId: number, reason: string | null): Order {
+    return this.#uow.run(() => {
+      const order = this.#orders.findForCustomer(buyer.id, orderId);
+      if (order === undefined) throw notFound("주문");
+      if (order.status === "cancelled") return order;
+      const next = cancelStatus(order.status);
+      const now = this.#clock.now();
+      this.#orders.saveStatus(order.id, next, now);
+      this.#orders.insertCancellation({ orderId: order.id, customerId: buyer.id, previousStatus: order.status, reason, at: now });
+      this.#inventory.restoreForOrder(order.id, stockLines(order), "주문 취소");
+      const cancelled = this.#orders.findById(order.id);
+      if (cancelled === undefined) throw new Error(`취소한 주문 ${order.number}을 다시 읽지 못했습니다`);
+      for (const listener of this.#cancelListeners) listener.orderCancelled(cancelled, now);
+      return cancelled;
     });
   }
 
