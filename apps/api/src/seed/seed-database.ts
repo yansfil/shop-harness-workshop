@@ -74,8 +74,7 @@ export function seedDatabase(db: Database): void {
           status = services.adminOrders.changeStatus(placed.order.id, next).order.status;
         }
       } else {
-        const admin = adminUser();
-        services.inventory.registerInbound(admin, event.productId, {
+        services.inventory.registerInbound(adminUser(), event.productId, {
           idempotencyKey: event.kind === "opening" ? `seed-opening-${event.productId}` : `seed-restock-${event.key}`,
           quantity: event.quantity,
           memo: event.kind === "opening" ? "초기 입고" : "정기 입고",
@@ -85,9 +84,15 @@ export function seedDatabase(db: Database): void {
   });
 }
 
-function adminUser(): SessionUser {
+function demoAdmin(): (typeof DEMO_ACCOUNTS)[number] {
   const admin = DEMO_ACCOUNTS.find((account) => account.role === "admin");
   if (admin === undefined) throw new Error("관리자 교육용 계정이 없습니다");
+  return admin;
+}
+
+/** 시드가 만드는 관리자는 항상 첫 사용자라 id가 1이다. */
+function adminUser(): SessionUser {
+  const admin = demoAdmin();
   return { id: 1, email: admin.email, name: admin.name, role: "admin", phone: null, address: null };
 }
 
@@ -102,9 +107,8 @@ function insertAccounts(db: Database, prng: Prng): SessionUser[] {
   const insert = db.prepare("INSERT INTO users (email, name, role, password_hash, phone, address, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)");
   // 데모 계정은 salt를 고정해야 시드를 다시 돌려도 해시가 같다. 실서비스 방식이 아니라 교육용이다.
   const salt = (): Buffer => Buffer.from(Array.from({ length: 16 }, () => prng.int(0, 255)));
-  const admin = adminUser();
-  const adminAccount = DEMO_ACCOUNTS.find((account) => account.role === "admin");
-  insert.run(admin.email, admin.name, "admin", hashPassword(adminAccount?.password ?? "", salt()), null, null, createdAt);
+  const admin = demoAdmin();
+  insert.run(admin.email, admin.name, "admin", hashPassword(admin.password, salt()), null, null, createdAt);
   const customers = planCustomers(prng).map((customer: SeedCustomer): SessionUser => {
     const hash = customer.password === undefined ? null : hashPassword(customer.password, salt());
     const result = insert.run(customer.email, customer.name, "customer", hash, customer.phone, customer.address, createdAt);
