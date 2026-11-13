@@ -29,6 +29,8 @@ export interface PlacedOrder {
   order: Order;
 }
 
+const MS_PER_DAY = 86_400_000;
+
 export class OrderService {
   readonly #orders: OrderRepository;
   readonly #catalog: CatalogService;
@@ -111,6 +113,23 @@ export class OrderService {
       for (const listener of this.#cancelListeners) listener.orderCancelled(cancelled, now);
       return cancelled;
     });
+  }
+
+  /** 이 고객의 주문 전부, 최신순 */
+  listForCustomer(customerId: number): Order[] {
+    return this.#orders.listByCustomer(customerId);
+  }
+
+  /** 이 고객의 주문 한 건. 남의 주문이거나 없으면 NotFound(주문이 있다는 사실도 드러내지 않는다). */
+  getForCustomer(customerId: number, orderId: number): Order {
+    const order = this.#orders.findForCustomer(customerId, orderId);
+    if (order === undefined) throw notFound("주문");
+    return order;
+  }
+
+  /** 주문한 지 며칠 지났는지. 오늘 주문이면 0이다. */
+  elapsedDays(order: Order): number {
+    return Math.max(0, Math.floor((this.#clock.now().getTime() - order.createdAt.getTime()) / MS_PER_DAY));
   }
 
   #price(lines: CartLine[]): PricedOrder {

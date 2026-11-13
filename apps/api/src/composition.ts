@@ -53,14 +53,14 @@ export function composeServices({ db, clock }: AppDependencies) {
 
 export function composeApp(dependencies: AppDependencies): Express {
   const services = composeServices(dependencies);
-  const { auth, catalog, inventory, orders, adminOrders, orderRepository } = services;
+  const { auth, catalog, inventory, orders, adminOrders } = services;
   bootLegacy(dependencies.db, services);
   return createApp(createSessionMiddleware(auth), [
     new HealthController(),
     new AuthController(auth),
     new CatalogController(catalog),
     new OrderController(orders),
-    new MyOrderController(orderRepository),
+    new MyOrderController(orders),
     new AdminOrderController(adminOrders),
     new InventoryController(inventory),
     new LegacyRoutes(),
