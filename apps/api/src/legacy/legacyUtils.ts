@@ -514,6 +514,12 @@ export function isPhone(value: any): boolean {
   return /^01\d-?\d{3,4}-?\d{4}$/.test(trim(value));
 }
 
+/** 앱 안 주소인지 (/로 시작하고 //가 아님) */
+export function isLocalLink(value: any): boolean {
+  const s = str(value);
+  return s.charAt(0) === "/" && s.charAt(1) !== "/" && !/\s/.test(s);
+}
+
 export function onlyDigits(value: any): string {
   return str(value).replace(/\D/g, "");
 }
@@ -846,6 +852,27 @@ export const NOTIFY_TYPES: any = {
   exchange_approved: { title: "교환이 승인됐어요", icon: "return", label: "교환 승인" },
   return_rejected: { title: "반품이 거절됐어요", icon: "return", label: "반품 거절" },
   points_expiring: { title: "포인트가 곧 사라져요", icon: "point", label: "포인트 소멸 예정" },
+  points_granted: { title: "포인트가 들어왔어요", icon: "point", label: "포인트 지급" },
+  exchange_shipped: { title: "교환 상품을 보냈어요", icon: "truck", label: "교환 발송" },
+  announcement: { title: "그랩마켓 소식", icon: "bell", label: "공지" },
+};
+
+/** 알림 종류별 수신 설정 묶음. order는 끌 수 없다 */
+export const NOTIFY_GROUPS: any = {
+  order_placed: "order",
+  order_cancelled: "order",
+  shipping_started: "order",
+  delivered: "order",
+  return_received: "order",
+  exchange_received: "order",
+  return_approved: "order",
+  exchange_approved: "order",
+  return_rejected: "order",
+  exchange_shipped: "order",
+  coupon_arrived: "coupons",
+  points_expiring: "points",
+  points_granted: "points",
+  announcement: "announcements",
 };
 
 export function notifyTypeLabel(type: any): string {
@@ -856,6 +883,9 @@ export const BATCH_JOBS: any = {
   settlement_close: { name: "일 마감 정산", time: "00:10" },
   point_expire: { name: "포인트 소멸", time: "00:30" },
   delivery_sync: { name: "배송 상태 동기화", time: null },
+  points_expiring_notice: { name: "포인트 소멸 예정 알림", time: "09:00" },
+  shipment_delay_check: { name: "배송 지연 점검", time: "08:00" },
+  notification_cleanup: { name: "지난 알림 정리", time: "03:00" },
 };
 
 export function batchJobName(job: any): string {
@@ -1057,6 +1087,177 @@ export function toItemDto(item: any): any {
     quantity: item.quantity,
     lineTotal: item.line_total,
   };
+}
+
+/* ------------------------------------------------------------------ */
+/* 영업일                                                               */
+/* ------------------------------------------------------------------ */
+
+/** 정산 지급·배송 예정일 계산에 쓰는 공휴일 (운영팀이 해마다 손으로 채운다) */
+export const HOLIDAYS: string[] = [
+  "2026-01-01",
+  "2026-02-16",
+  "2026-02-17",
+  "2026-02-18",
+  "2026-03-01",
+  "2026-03-02",
+  "2026-05-05",
+  "2026-05-24",
+  "2026-05-25",
+  "2026-06-03",
+  "2026-06-06",
+  "2026-08-15",
+  "2026-08-17",
+  "2026-09-24",
+  "2026-09-25",
+  "2026-09-26",
+  "2026-10-03",
+  "2026-10-05",
+  "2026-10-09",
+  "2026-12-25",
+  "2027-01-01",
+  "2027-02-06",
+  "2027-02-07",
+  "2027-02-08",
+  "2027-02-09",
+  "2027-03-01",
+];
+
+export function isHoliday(value: any): boolean {
+  return HOLIDAYS.indexOf(ymd(value)) >= 0;
+}
+
+export function isWeekend(value: any): boolean {
+  const day = toDate(value).getUTCDay();
+  return day === 0 || day === 6;
+}
+
+export function isBusinessDay(value: any): boolean {
+  return !isWeekend(value) && !isHoliday(value);
+}
+
+/** value 다음 n번째 영업일 */
+export function addBusinessDays(value: any, n: number): Date {
+  let d = startOfDay(value);
+  let left = n;
+  let guard = 0;
+  while (left > 0 && guard < 400) {
+    d = addDays(d, 1);
+    if (isBusinessDay(d)) left--;
+    guard++;
+  }
+  return d;
+}
+
+/** from~to 사이 영업일 수 (from 다음 날부터 to까지) */
+export function businessDaysBetween(from: any, to: any): number {
+  let d = startOfDay(from);
+  const end = startOfDay(to).getTime();
+  let n = 0;
+  let guard = 0;
+  while (d.getTime() < end && guard < 400) {
+    d = addDays(d, 1);
+    if (isBusinessDay(d)) n++;
+    guard++;
+  }
+  return n;
+}
+
+const WEEKDAY_KO = ["일", "월", "화", "수", "목", "금", "토"];
+
+/** 11-16(월) */
+export function fmtMdWeek(value: any): string {
+  if (value == null || value === "") return "";
+  return fmtMd(value) + "(" + WEEKDAY_KO[toDate(value).getUTCDay()] + ")";
+}
+
+/* ------------------------------------------------------------------ */
+/* 붙여 넣은 글 읽기                                                     */
+/* ------------------------------------------------------------------ */
+
+/** 엑셀에서 붙여 넣은 줄을 칸으로 나눈다. 쉼표·탭 모두 받는다. 따옴표 안 쉼표는 칸을 나누지 않는다 */
+export function parseCsvLine(line: string): string[] {
+  const out: string[] = [];
+  let cur = "";
+  let quoted = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (quoted) {
+      if (ch === '"' && line[i + 1] === '"') {
+        cur += '"';
+        i++;
+      } else if (ch === '"') {
+        quoted = false;
+      } else {
+        cur += ch;
+      }
+      continue;
+    }
+    if (ch === '"') {
+      quoted = true;
+    } else if (ch === "," || ch === "\t") {
+      out.push(cur.trim());
+      cur = "";
+    } else {
+      cur += ch;
+    }
+  }
+  out.push(cur.trim());
+  return out;
+}
+
+/** 여러 줄 글 → [{ line: 줄 번호(1부터), cells }]. 빈 줄과 #으로 시작하는 줄은 건너뛴다 */
+export function parseCsvText(text: any): any[] {
+  const rows: any[] = [];
+  const lines = str(text).replace(/\r\n?/g, "\n").split("\n");
+  for (let i = 0; i < lines.length; i++) {
+    const raw = String(lines[i]).replace(/^\uFEFF/, "");
+    if (raw.trim() === "" || raw.trim().charAt(0) === "#") continue;
+    rows.push({ line: i + 1, cells: parseCsvLine(raw) });
+  }
+  return rows;
+}
+
+/** 첫 줄이 머리글이면 뺀다 (숫자가 하나도 없으면 머리글로 본다) */
+export function dropHeader(rows: any[]): any[] {
+  if (rows.length === 0) return rows;
+  const first = rows[0].cells.join("");
+  if (!/[0-9]/.test(first)) return rows.slice(1);
+  return rows;
+}
+
+/** 쉼표·줄바꿈·공백으로 나눈 목록 */
+export function splitList(text: any): string[] {
+  return str(text)
+    .split(/[\s,;]+/)
+    .map((x) => x.trim())
+    .filter((x) => x !== "");
+}
+
+/** 01012345678 → 010-1234-5678 */
+export function formatPhone(value: any): string {
+  const d = onlyDigits(value);
+  if (d.length === 11) return d.slice(0, 3) + "-" + d.slice(3, 7) + "-" + d.slice(7);
+  if (d.length === 10 && d.indexOf("02") === 0) return d.slice(0, 2) + "-" + d.slice(2, 6) + "-" + d.slice(6);
+  if (d.length === 10) return d.slice(0, 3) + "-" + d.slice(3, 6) + "-" + d.slice(6);
+  if (d.length === 9) return d.slice(0, 2) + "-" + d.slice(2, 5) + "-" + d.slice(5);
+  return str(value);
+}
+
+/** 퍼센트 글자: 0.1234 → 12.3% */
+export function percentText(ratio: any, digits?: number): string {
+  const n = toNumber(ratio);
+  if (!isFinite(n)) return "-";
+  return (n * 100).toFixed(digits == null ? 1 : digits) + "%";
+}
+
+/** 앞 기간 대비 증감 글자: +12.3% / -4.0% / - */
+export function changeText(current: any, previous: any): string {
+  const c = toNumber(current);
+  const p = toNumber(previous);
+  if (p === 0) return c === 0 ? "0%" : "-";
+  const r = (c - p) / p;
+  return (r > 0 ? "+" : "") + (r * 100).toFixed(1) + "%";
 }
 
 /* ------------------------------------------------------------------ */

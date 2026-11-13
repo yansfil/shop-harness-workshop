@@ -388,4 +388,31 @@ export function seedLegacyData(db: any, services: any, baseDate: Date): void {
     }
     insClosed.run(r.day, r.orderCount, r.goodsAmount, r.shippingAmount, r.couponDiscount, r.pointUsed, r.netAmount, new Date(closeStart + duration).toISOString(), runId);
   }
+
+  /* 교환 재발송: 승인된 교환 중 가장 최근 한 건만 아직 보내지 않았다 */
+  const exchanges: any[] = db.prepare("SELECT id, decided_at FROM return_requests WHERE kind = 'exchange' AND state = 'approved' ORDER BY decided_at, id").all();
+  const insReship = prep("INSERT INTO return_shipments (return_id, courier_code, tracking_no, registered_by, registered_at, delivered_at) VALUES (?, ?, ?, ?, ?, ?)");
+  exchanges.slice(0, Math.max(exchanges.length - 1, 0)).forEach((x: any) => {
+    const courier = randPick(rand, COURIERS).code;
+    seq[courier] = (seq[courier] || 552100870000) + randInt(rand, 1, 7);
+    const registered = Math.min(Date.parse(x.decided_at) + 3 * HOUR, base - 2 * HOUR);
+    const delivered = registered + DAY <= base ? new Date(registered + DAY).toISOString() : null;
+    insReship.run(x.id, courier, makeTrackingNo(courier, seq[courier]), admin.id, new Date(registered).toISOString(), delivered);
+  });
+
+  /* 정산 조정: 지난 마감일 두 건 */
+  const insAdjust = prep("INSERT INTO settlement_adjustments (day, amount, reason, created_by, created_at, cancelled_at) VALUES (?, ?, ?, ?, ?, NULL)");
+  if (closedRows.length > 8) {
+    const a = closedRows[closedRows.length - 6];
+    const b = closedRows[closedRows.length - 3];
+    insAdjust.run(a.day, -15000, "택배 파손 보상", admin.id, new Date(Date.parse(startIso(a.day)) + DAY + 11 * HOUR).toISOString());
+    insAdjust.run(b.day, 4200, "가상 결제 수수료 환급", admin.id, new Date(Date.parse(startIso(b.day)) + DAY + 15 * HOUR).toISOString());
+  }
+
+  /* 알림 수신 설정: 일부 고객은 쿠폰·공지 알림을 껐다 */
+  const insSettings = prep("INSERT INTO notification_settings (user_id, order_updates, coupons, points, announcements, updated_at) VALUES (?, 1, ?, 1, ?, ?)");
+  for (const u of users) {
+    if (demoIds.indexOf(Number(u.id)) >= 0 || rand() > 0.08) continue;
+    insSettings.run(Number(u.id), rand() < 0.5 ? 0 : 1, 0, new Date(base - randInt(rand, 5, 200) * DAY).toISOString());
+  }
 }

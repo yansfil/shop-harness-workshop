@@ -64,3 +64,42 @@ export function recentlyRegistered(sinceIso: string): any[] {
     sinceIso,
   );
 }
+
+/** 결제·배송준비 상태로 오래 머문 주문 (송장 없음) */
+export function waitingOrders(beforeIso: string, limit: number): any[] {
+  return all(
+    "SELECT o.id, o.order_number, o.status, o.created_at, u.name AS customer_name, u.email AS customer_email FROM orders o JOIN users u ON u.id = o.customer_id " +
+      "LEFT JOIN shipments s ON s.order_id = o.id WHERE o.status IN ('paid', 'preparing') AND s.id IS NULL AND o.created_at < ? ORDER BY o.created_at LIMIT ?",
+    beforeIso,
+    limit,
+  );
+}
+
+/** 등록한 지 오래됐는데 아직 도착하지 않은 송장 */
+export function lateShipments(beforeIso: string, limit: number): any[] {
+  return all(
+    "SELECT s.*, o.order_number, u.name AS customer_name, u.email AS customer_email FROM shipments s JOIN orders o ON o.id = s.order_id JOIN users u ON u.id = o.customer_id " +
+      "WHERE s.delivered_at IS NULL AND s.registered_at < ? ORDER BY s.registered_at LIMIT ?",
+    beforeIso,
+    limit,
+  );
+}
+
+/** 택배사별 건수와 평균 배송 시간(분) */
+export function courierSums(fromIso: string, toIso: string): any[] {
+  return all(
+    "SELECT courier_code, COUNT(*) AS n, SUM(CASE WHEN delivered_at IS NOT NULL THEN 1 ELSE 0 END) AS delivered, " +
+      "AVG(CASE WHEN delivered_at IS NOT NULL THEN (julianday(delivered_at) - julianday(registered_at)) * 1440 END) AS avg_minutes " +
+      "FROM shipments WHERE registered_at >= ? AND registered_at < ? GROUP BY courier_code ORDER BY courier_code",
+    fromIso,
+    toIso,
+  );
+}
+
+export function shipmentsBetween(fromIso: string, toIso: string): any[] {
+  return all(
+    "SELECT s.*, o.order_number, o.recipient_name, o.shipping_address FROM shipments s JOIN orders o ON o.id = s.order_id WHERE s.registered_at >= ? AND s.registered_at < ? ORDER BY s.registered_at, s.id",
+    fromIso,
+    toIso,
+  );
+}

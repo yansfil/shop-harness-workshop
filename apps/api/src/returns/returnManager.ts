@@ -33,6 +33,7 @@ import {
 import * as dao from "./infra/returnDao.ts";
 import { RETURN_KINDS, checkRequestItems, eligibility, reasonCodes, refundAmountFor, remainingQuantities } from "./domain/returnPolicy.ts";
 import { restoreReturnedStock } from "./application/stockRestore.ts";
+import { reshipOf } from "./exchangeShipping.ts";
 
 function nextRequestNo(): string {
   const last = dao.lastRequestNo();
@@ -73,6 +74,7 @@ function requestDto(r: any, items: any[]): any {
     decidedAtText: fmtMdHm(r.decided_at),
     items: items.map(itemDto),
     itemSummary: itemSummary(items),
+    reship: r.kind === "exchange" && r.state === "approved" ? reshipOf(r.id) : null,
   };
 }
 

@@ -45,7 +45,25 @@ export function insertSkipped(job: string, runKey: string, trigger: string, atIs
 }
 
 export function deleteRun(id: number): void {
+  run("DELETE FROM batch_run_logs WHERE run_id = ?", id);
   run("DELETE FROM batch_runs WHERE id = ?", id);
+}
+
+export function addLogs(runId: number, level: string, messages: string[], atIso: string): void {
+  for (const m of messages) insert("batch_run_logs", { run_id: runId, level: level, message: String(m).slice(0, 300), created_at: atIso });
+}
+
+export function logsOf(runId: number): any[] {
+  return all("SELECT * FROM batch_run_logs WHERE run_id = ? ORDER BY id", runId);
+}
+
+export function findRun(id: number): any {
+  return one("SELECT * FROM batch_runs WHERE id = ?", id);
+}
+
+/** 작업별 최근 30일 성공·실패 수 */
+export function stateCounts(sinceIso: string): any[] {
+  return all("SELECT job_name, state, COUNT(*) AS n FROM batch_runs WHERE started_at >= ? GROUP BY job_name, state", sinceIso);
 }
 
 export function lastRun(job: string, runKey?: string): any {
@@ -71,6 +89,12 @@ export function clearStaleRunning(beforeIso: string): number {
 }
 
 export function trimOld(job: string, keep: number): number {
+  run(
+    "DELETE FROM batch_run_logs WHERE run_id IN (SELECT id FROM batch_runs WHERE job_name = ? AND id NOT IN (SELECT id FROM batch_runs WHERE job_name = ? ORDER BY id DESC LIMIT ?))",
+    job,
+    job,
+    keep,
+  );
   return Number(
     run(
       "DELETE FROM batch_runs WHERE job_name = ? AND id NOT IN (SELECT id FROM batch_runs WHERE job_name = ? ORDER BY id DESC LIMIT ?)",

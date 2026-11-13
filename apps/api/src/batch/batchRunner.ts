@@ -9,6 +9,7 @@ import {
   fmtMdHm,
   log,
   logError,
+  notFoundError,
   now,
   nowIso,
   startOfDay,
@@ -62,11 +63,13 @@ export function runJob(job: string, trigger: string, runKeyInput?: string): any 
       if (before) note = fmtMdHm(before.started_at).slice(6) + " 실패분을 다시 실행했어요";
     }
     dao.finishRun(id, "success", result.processed, result.total, note, nowIso(), duration);
+    if (result.logs && result.logs.length > 0) dao.addLogs(id, "info", result.logs, nowIso());
     log("batch_finished", { job: job, runId: id, processed: result.processed, ms: duration });
     return { id: id, job: job, state: "success", processed: result.processed, total: result.total };
   } catch (e: any) {
     const duration = Date.now() - started;
     dao.finishRun(id, "failed", 0, null, errorText(e), nowIso(), duration);
+    dao.addLogs(id, "error", [errorText(e)], nowIso());
     logError("batch_failed", e, { job: job, runId: id });
     return { id: id, job: job, state: "failed", note: errorText(e) };
   } finally {
@@ -136,4 +139,45 @@ export function recoverStale(): number {
 
 export function yesterdayKey(): string {
   return ymd(addDays(startOfDay(now()), -1));
+}
+
+/** 실행 한 건의 로그 */
+export function runLogs(idInput: any): any {
+  const id = Number(idInput);
+  const r = dao.findRun(id);
+  if (!r) throw notFoundError("실행 기록을 찾을 수 없습니다.");
+  return {
+    id: r.id,
+    job: r.job_name,
+    jobName: batchJobName(r.job_name),
+    state: r.state,
+    startedAtText: fmtMdHm(r.started_at),
+    logs: dao.logsOf(id).map((l: any) => ({ id: l.id, level: l.level, message: l.message, atText: fmtMdHm(l.created_at) })),
+  };
+}
+
+/** 작업별 최근 30일 성공률 */
+export function healthSummary(): any {
+  const since = addDays(now(), -30).toISOString();
+  const byJob: any = {};
+  for (const r of dao.stateCounts(since)) {
+    if (!byJob[r.job_name]) byJob[r.job_name] = { success: 0, failed: 0, skipped: 0, running: 0 };
+    byJob[r.job_name][r.state] = Number(r.n);
+  }
+  return {
+    jobs: Object.keys(BATCH_JOBS).map((k) => {
+      const c = byJob[k] || { success: 0, failed: 0, skipped: 0, running: 0 };
+      const last = dao.lastRun(k);
+      return {
+        job: k,
+        name: BATCH_JOBS[k].name,
+        time: BATCH_JOBS[k].time,
+        success: c.success,
+        failed: c.failed,
+        skipped: c.skipped,
+        lastState: last ? last.state : null,
+        lastStartedAtText: last ? fmtMdHm(last.started_at) : null,
+      };
+    }),
+  };
 }

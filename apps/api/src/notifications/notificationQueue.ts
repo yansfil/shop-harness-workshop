@@ -1,6 +1,7 @@
 // 알림 대기열: 일이 생기면 대기열에 넣고, 작업자가 몇 초마다 꺼내 알림함으로 보낸다.
 import {
   CONFIG,
+  NOTIFY_GROUPS,
   STATE,
   addMinutes,
   badRequest,
@@ -19,9 +20,19 @@ import {
   tx,
 } from "../legacy/legacyUtils.ts";
 import * as dao from "./infra/notificationDao.ts";
+import { findSettings } from "./infra/settingsDao.ts";
 import { iconOf, queueSummary, render } from "./domain/notificationTemplates.ts";
 
+/** 고객이 수신 설정에서 끈 종류인지 (주문 알림은 끌 수 없다) */
+function turnedOff(userId: any, type: string): boolean {
+  const group = NOTIFY_GROUPS[type];
+  if (!group || group === "order") return false;
+  const s = findSettings(userId);
+  return !!s && !s[group];
+}
+
 export function enqueue(userId: any, type: string, payload: any, at?: string): number {
+  if (turnedOff(userId, type)) return 0;
   const when = at || nowIso();
   return dao.insertQueue({
     user_id: Number(userId),
@@ -182,4 +193,6 @@ export function listen(): void {
     enqueueForOrder(type, e.orderId, { itemText: e.itemText, requestNo: e.requestNo, refundAmount: e.refundAmount, reason: e.reason }, e.at);
   });
   on("points.expiring", (e: any) => enqueue(e.userId, "points_expiring", { points: e.points, dateText: e.dateText }, e.at));
+  on("points.granted", (e: any) => enqueue(e.userId, "points_granted", { points: e.points, title: e.title }, e.at));
+  on("exchange.shipped", (e: any) => enqueueForOrder("exchange_shipped", e.orderId, { itemText: e.itemText, requestNo: e.requestNo, trackingNo: e.trackingNo }, e.at));
 }

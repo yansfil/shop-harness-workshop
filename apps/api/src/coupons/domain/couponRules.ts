@@ -7,6 +7,7 @@ export const CODE_PATTERN = /^[A-Z0-9]{4,20}$/;
 /** 지금 쿠폰 상태 */
 export function couponState(coupon: any, at: any): string {
   const t = toDate(at).getTime();
+  if (coupon.paused_at) return "paused";
   if (Number(coupon.issued_count) >= Number(coupon.issue_limit) && Number(coupon.used_count) >= Number(coupon.issue_limit)) return "exhausted";
   if (Number(coupon.used_count) >= Number(coupon.issue_limit)) return "exhausted";
   if (t > toDate(coupon.ends_at).getTime()) return "expired";
@@ -24,6 +25,7 @@ export function checkApplicable(coupon: any, subtotal: any, alreadyUsed: boolean
   if (state === "scheduled") return { ok: false, code: "COUPON_NOT_STARTED", message: notStartedMessage(coupon.starts_at) };
   if (state === "expired") return { ok: false, code: "COUPON_EXPIRED", message: expiredMessage(coupon.ends_at) };
   if (state === "exhausted") return { ok: false, code: "COUPON_EXHAUSTED", message: COUPON_MESSAGES.EXHAUSTED };
+  if (state === "paused") return { ok: false, code: "COUPON_PAUSED", message: COUPON_MESSAGES.PAUSED };
   if (alreadyUsed) return { ok: false, code: "COUPON_ALREADY_USED", message: COUPON_MESSAGES.ALREADY_USED };
   if (toNumber(subtotal) < toNumber(coupon.min_order_amount)) {
     return { ok: false, code: "COUPON_MIN_ORDER", message: minOrderMessage(coupon.min_order_amount, subtotal) };

@@ -10,6 +10,7 @@ export const COUPON_MESSAGES: any = {
   MIN_ORDER: "최소 주문 금액을 채우지 못했어요.",
   ONE_PER_ORDER: "쿠폰은 주문당 한 장만 쓸 수 있어요.",
   ADMIN: "관리자 계정은 쿠폰을 쓸 수 없어요.",
+  PAUSED: "지금은 잠시 쓸 수 없는 쿠폰이에요.",
 };
 
 export function minOrderMessage(minOrder: any, subtotal: any): string {
@@ -35,5 +36,6 @@ export function couponStateText(state: string): string {
   if (state === "scheduled") return "시작 전";
   if (state === "expired") return "만료";
   if (state === "exhausted") return "소진";
+  if (state === "paused") return "중지";
   return state;
 }

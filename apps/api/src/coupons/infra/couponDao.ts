@@ -76,3 +76,38 @@ export function redemptionsOf(couponId: any): any[] {
     Number(couponId),
   );
 }
+
+export function setPaused(couponId: any, at: string | null): number {
+  return Number(run("UPDATE coupons SET paused_at = ? WHERE id = ?", at, Number(couponId)).changes);
+}
+
+export function setEndsAt(couponId: any, endsAt: string): number {
+  return Number(run("UPDATE coupons SET ends_at = ? WHERE id = ?", endsAt, Number(couponId)).changes);
+}
+
+export function raiseIssueLimit(couponId: any, limit: number): number {
+  return Number(run("UPDATE coupons SET issue_limit = ? WHERE id = ? AND issue_limit < ?", limit, Number(couponId), limit).changes);
+}
+
+export function walletHolders(couponId: any): any[] {
+  return all(
+    "SELECT w.*, u.email, u.name FROM coupon_wallet w JOIN users u ON u.id = w.user_id WHERE w.coupon_id = ? ORDER BY w.received_at DESC, w.id DESC",
+    Number(couponId),
+  );
+}
+
+export function customersByEmails(emails: string[]): any[] {
+  if (emails.length === 0) return [];
+  return all(
+    "SELECT id, email, name FROM users WHERE role = 'customer' AND lower(email) IN (" + emails.map(() => "?").join(", ") + ")",
+    ...emails.map((e) => e.toLowerCase()),
+  );
+}
+
+export function endingBetween(fromIso: string, toIso: string): any[] {
+  return all("SELECT * FROM coupons WHERE paused_at IS NULL AND ends_at >= ? AND ends_at < ? ORDER BY ends_at", fromIso, toIso);
+}
+
+export function unusedWalletFor(couponId: any): any[] {
+  return all("SELECT user_id FROM coupon_wallet WHERE coupon_id = ? AND used_at IS NULL ORDER BY user_id", Number(couponId));
+}

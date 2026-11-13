@@ -35,6 +35,12 @@ export function render(type: string, payload: any): any {
       return { title: meta.title, body: join([itemText, orderText, str(p.reason)]), link: "/returns", icon: meta.icon };
     case "points_expiring":
       return { title: meta.title, body: comma(p.points) + "P가 " + str(p.dateText) + "에 사라져요", link: "/points", icon: meta.icon };
+    case "points_granted":
+      return { title: meta.title, body: join([str(p.title), comma(p.points) + "P 적립"]), link: "/points", icon: meta.icon };
+    case "exchange_shipped":
+      return { title: meta.title, body: join([itemText, orderText, p.trackingNo ? "송장 " + str(p.trackingNo) : ""]), link: "/returns", icon: meta.icon };
+    case "announcement":
+      return { title: str(p.title) || meta.title, body: str(p.body), link: p.link || null, icon: meta.icon };
     default:
       return { title: meta.title, body: str(p.body), link: p.link || null, icon: meta.icon };
   }
@@ -45,6 +51,8 @@ export function queueSummary(type: string, payload: any): string {
   const p = payload || {};
   if (type === "coupon_arrived") return str(p.name) + " · " + comma(p.discountAmount) + "원 할인";
   if (type === "points_expiring") return comma(p.points) + "P 소멸 예정";
+  if (type === "points_granted") return str(p.title) + " · " + comma(p.points) + "P";
+  if (type === "announcement") return str(p.title);
   const parts: string[] = [];
   if (p.itemText) parts.push(str(p.itemText));
   if (p.orderNumber) parts.push(shortOrderNo(p.orderNumber));

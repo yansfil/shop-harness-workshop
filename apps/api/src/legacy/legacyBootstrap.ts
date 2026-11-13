@@ -11,6 +11,13 @@ import { registerNotificationRoutes } from "../notifications/web/notificationCon
 import { registerBatchRoutes } from "../batch/web/batchController.ts";
 import { registerCheckoutRoutes } from "../checkout/web/checkoutController.ts";
 import { registerOrderExtrasRoutes } from "../checkout/web/orderExtrasController.ts";
+import { registerSettlementReportRoutes } from "../settlement/web/settlementReportController.ts";
+import { registerPointCampaignRoutes } from "../points/web/pointCampaignController.ts";
+import { registerCouponOpsRoutes } from "../coupons/web/couponOpsController.ts";
+import { registerDeliveryOpsRoutes } from "../delivery/web/deliveryOpsController.ts";
+import { registerReturnOpsRoutes } from "../returns/web/returnOpsController.ts";
+import { registerNotificationSettingsRoutes } from "../notifications/web/notificationSettingsController.ts";
+import { registerAccountSummaryRoutes } from "./accountSummary.ts";
 import { listen } from "../notifications/notificationQueue.ts";
 import { startNotificationWorker, stopNotificationWorker } from "../notifications/notificationWorker.ts";
 import { startBatchScheduler, stopBatchScheduler } from "../batch/batchScheduler.ts";
@@ -19,11 +26,18 @@ export class LegacyRoutes implements Controller {
   register(router: Router): void {
     registerCheckoutRoutes(router);
     registerOrderExtrasRoutes(router);
+    registerAccountSummaryRoutes(router);
+    registerPointCampaignRoutes(router);
     registerPointRoutes(router);
+    registerCouponOpsRoutes(router);
     registerCouponRoutes(router);
+    registerSettlementReportRoutes(router);
     registerSettlementRoutes(router);
+    registerDeliveryOpsRoutes(router);
     registerDeliveryRoutes(router);
+    registerReturnOpsRoutes(router);
     registerReturnRoutes(router);
+    registerNotificationSettingsRoutes(router);
     registerNotificationRoutes(router);
     registerBatchRoutes(router);
   }
