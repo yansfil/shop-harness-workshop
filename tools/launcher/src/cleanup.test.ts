@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { findHere } from "./command.ts";
@@ -74,6 +74,22 @@ describe("node cleanup.mjs", () => {
     expect(existsSync(path.join(dirty, "work-in-progress.txt"))).toBe(true);
     expect(existsSync(clean)).toBe(false);
     expect(existsSync(f.practiceDir)).toBe(false);
+  });
+
+  it("실습 설정 폴더가 원래 ~/.claude로 연결돼 있으면 로그아웃·삭제 없이 미리 보기 단계에서 거부한다", () => {
+    const { f, clean } = practiced();
+    rmSync(f.practiceDir, { recursive: true });
+    symlinkSync(f.originalClaudeDir, f.practiceDir, "junction");
+    const before = originalClaudeState(f);
+    const result = f.run("cleanup.mjs", [], { input: "y\ny\n" });
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('cleanup.mjs가 "지울 것 미리 보기" 단계에서 멈췄습니다');
+    expect(result.stderr).toContain("원래 설정");
+    expect(f.claudeLog()).toEqual([]);
+    expect(lstatSync(f.practiceDir).isSymbolicLink()).toBe(true);
+    expect(existsSync(clean)).toBe(true);
+    expect(originalClaudeState(f)).toEqual(before);
   });
 
   it("기록 내보내기를 고르면 viewer.mjs --export로 레포 안 exports/에 내보낸다", () => {

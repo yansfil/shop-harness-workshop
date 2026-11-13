@@ -6,7 +6,7 @@ import os from "node:os";
 import path from "node:path";
 import { createInterface } from "node:readline";
 import { capture, findHere, runVisible } from "./command.ts";
-import { practiceConfigDir, REPO_ROOT } from "./paths.ts";
+import { claudeEnv, REPO_ROOT, resolvePracticeConfigDir } from "./paths.ts";
 import { runSteps, StepFailure } from "./report.ts";
 
 const SCRIPT = "cleanup.mjs";
@@ -78,17 +78,17 @@ function exportDir(): string {
 
 /** cleanup.mjs가 Node 24를 확인한 뒤 부른다. 프로세스 종료 코드를 돌려준다. */
 export async function runCleanup(): Promise<number> {
-  const configDir = practiceConfigDir();
-  const configExists = existsSync(configDir);
-  let worktrees: string[] = [];
-
+  const preview: { configDir: string; configExists: boolean; worktrees: string[] } = { configDir: "", configExists: false, worktrees: [] };
   const previewed = await runSteps(
     SCRIPT,
     [
       {
         name: "지울 것 미리 보기",
         run: () => {
-          worktrees = practiceWorktrees();
+          // 로그아웃·삭제할 폴더가 원래 설정·레포와 겹치지 않는지 무엇보다 먼저 확인한다.
+          preview.configDir = resolvePracticeConfigDir();
+          preview.configExists = existsSync(preview.configDir);
+          preview.worktrees = practiceWorktrees();
           return "아래 목록";
         },
       },
@@ -97,6 +97,7 @@ export async function runCleanup(): Promise<number> {
     TOTAL_STEPS,
   );
   if (!previewed) return 1;
+  const { configDir, configExists, worktrees } = preview;
 
   console.log(`  실습 설정 폴더: ${configDir} ${configExists ? `(세션 기록 ${countSessions(configDir)}개)` : "(없음)"}`);
   if (worktrees.length === 0) console.log("  실습 worktree: 없음");
@@ -123,7 +124,7 @@ export async function runCleanup(): Promise<number> {
               if (!existsSync(viewer)) throw new StepFailure("viewer.mjs가 없어 기록을 내보낼 수 없습니다. 아무것도 지우지 않았습니다.");
               const code = runVisible(process.execPath, [viewer, "--export", target], {
                 cwd: REPO_ROOT,
-                env: { ...process.env, CLAUDE_CONFIG_DIR: configDir },
+                env: claudeEnv(configDir),
               });
               if (code !== 0) throw new StepFailure(`기록 내보내기가 실패했습니다(종료 코드 ${code}). 아무것도 지우지 않았습니다.`);
               return `통과 (${path.relative(REPO_ROOT, target)})`;
@@ -154,7 +155,7 @@ export async function runCleanup(): Promise<number> {
         name: "실습 설정 폴더 쪽 로그아웃",
         run: () => {
           if (!configExists) return "건너뜀 (실습 설정 폴더가 없음)";
-          const code = runVisible(claudePath(), ["auth", "logout"], { cwd: REPO_ROOT, env: { ...process.env, CLAUDE_CONFIG_DIR: configDir } });
+          const code = runVisible(claudePath(), ["auth", "logout"], { cwd: REPO_ROOT, env: claudeEnv(configDir) });
           if (code !== 0) throw new StepFailure(`claude auth logout이 실패했습니다(종료 코드 ${code}). 아무것도 지우지 않았습니다.`);
           return `통과 (CLAUDE_CONFIG_DIR=${configDir})`;
         },

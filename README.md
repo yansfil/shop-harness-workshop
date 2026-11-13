@@ -23,7 +23,7 @@ cd shop-harness-workshop
 node start.mjs --check
 ```
 
-`--check`는 Node 24 → claude 명령 → 의존성(없으면 `npm ci`) → DB(없으면 만들고 시드) → 실습 설정 폴더·`.env`까지 준비하고 결과를 단계마다 보여 줍니다.
+`--check`는 Node 24 → 실습 설정 폴더 위치(원래 `~/.claude`·레포와 겹치지 않는지) → claude 명령 → 의존성(없으면 `npm ci`) → DB(없으면 만들고 시드) → 실습 설정 폴더·`.env`까지 준비하고 결과를 단계마다 보여 줍니다.
 claude는 띄우지 않습니다.
 실패하면 멈춘 단계 이름, 이유, 설치 링크가 나옵니다.
 

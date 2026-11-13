@@ -1,16 +1,16 @@
 // node start.mjs [--check] [claude에 넘길 옵션...]
-// Node 24 확인(start.mjs가 먼저 함) → claude 명령 → 의존성 → DB → 실습 설정 폴더·.env·관찰 Hook → claude 실행.
-// --check는 5단계까지만 한다. 어느 단계도 조용히 건너뛰지 않고, 실패하면 단계 이름·이유·할 일을 보이고 1로 끝난다.
+// Node 24 확인(start.mjs가 먼저 함) → 실습 설정 폴더 위치 → claude 명령 → 의존성 → DB → 실습 설정 폴더·.env·관찰 Hook → claude 실행.
+// 위치 확인은 부작용이 있는 어떤 단계보다 먼저 한다. --check는 실행 전 단계까지만 한다. 어느 단계도 조용히 건너뛰지 않고, 실패하면 단계 이름·이유·할 일을 보이고 1로 끝난다.
 import { copyFileSync, constants as fsConstants, existsSync, mkdirSync, readFileSync, statSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { parseEnv } from "node:util";
 import { capture, findHere, runVisible, spawnInteractive } from "./command.ts";
-import { OBSERVER_SETTINGS_PATH, practiceConfigDir, REPO_ROOT } from "./paths.ts";
+import { claudeEnv, OBSERVER_SETTINGS_PATH, REPO_ROOT, resolvePracticeConfigDir } from "./paths.ts";
 import { runSteps, StepFailure, type Step } from "./report.ts";
 
 const SCRIPT = "start.mjs";
-export const TOTAL_STEPS = 6;
+export const TOTAL_STEPS = 7;
 const RELEASES_URL = "https://github.com/yansfil/shop-harness-workshop/releases";
 
 export const CLAUDE_INSTALL_HELP = [
@@ -27,10 +27,10 @@ function relative(file: string): string {
 }
 
 /** PATH에서 claude를 찾고 --version으로 실행되는지 본다. 찾은 경로를 돌려준다. */
-function checkClaude(): { claude: string; detail: string } {
+function checkClaude(configDir: string): { claude: string; detail: string } {
   const claude = findHere("claude");
   if (claude === null) throw new StepFailure("PATH에서 claude 명령을 찾지 못했습니다.", CLAUDE_INSTALL_HELP);
-  const result = capture(claude, ["--version"], { cwd: REPO_ROOT });
+  const result = capture(claude, ["--version"], { cwd: REPO_ROOT, env: claudeEnv(configDir) });
   if (result.status !== 0) {
     throw new StepFailure(`claude --version이 실패했습니다(종료 코드 ${result.status}). ${result.stderr.trim()}`, CLAUDE_INSTALL_HELP);
   }
@@ -88,13 +88,12 @@ async function ensureDatabase(): Promise<string> {
   return `새로 만듦 (npm run db:reset): ${relative(file)}`;
 }
 
-function prepareConfig(): string {
+function prepareConfig(configDir: string): string {
   if (!existsSync(OBSERVER_SETTINGS_PATH)) {
     throw new StepFailure(`관찰 Hook 설정이 없습니다: ${relative(OBSERVER_SETTINGS_PATH)}`, [
       "레포 파일이 빠졌습니다. git status로 확인하거나 레포를 다시 받으세요.",
     ]);
   }
-  const configDir = practiceConfigDir();
   const configExisted = existsSync(configDir);
   mkdirSync(configDir, { recursive: true });
 
@@ -114,13 +113,12 @@ function prepareConfig(): string {
  * Ctrl+C는 터미널이 부모와 claude 모두에게 보내므로 부모는 SIGINT를 무시해 claude보다 먼저 죽지 않는다.
  * 터미널이 닫히거나(SIGHUP) 종료 요청(SIGTERM)을 받으면 claude에 넘기고 claude가 끝나기를 기다린다.
  */
-function launchClaude(claude: string, claudeArgs: readonly string[]): Promise<number> {
-  const configDir = practiceConfigDir();
+function launchClaude(claude: string, configDir: string, claudeArgs: readonly string[]): Promise<number> {
   const args = ["--settings", OBSERVER_SETTINGS_PATH, ...claudeArgs];
   console.log(`[${TOTAL_STEPS}/${TOTAL_STEPS}] claude 실행: CLAUDE_CONFIG_DIR=${configDir} claude ${args.join(" ")}\n`);
 
   return new Promise((resolve) => {
-    const child = spawnInteractive(claude, args, { cwd: REPO_ROOT, env: { ...process.env, CLAUDE_CONFIG_DIR: configDir } });
+    const child = spawnInteractive(claude, args, { cwd: REPO_ROOT, env: claudeEnv(configDir) });
     const ignoreInterrupt = (): void => undefined;
     const forward = (signal: NodeJS.Signals): void => {
       child.kill(signal);
@@ -151,23 +149,31 @@ export async function runStart(argv: readonly string[]): Promise<number> {
   const checkOnly = argv.includes("--check");
   const claudeArgs = argv.filter((arg) => arg !== "--check");
   let claude = "";
+  let configDir = "";
   const steps: Step[] = [
+    {
+      name: "실습 설정 폴더 위치",
+      run: () => {
+        configDir = resolvePracticeConfigDir();
+        return `통과 (${configDir}, 원래 설정·레포와 겹치지 않음)`;
+      },
+    },
     {
       name: "claude 명령 확인",
       run: () => {
-        const found = checkClaude();
+        const found = checkClaude(configDir);
         claude = found.claude;
         return found.detail;
       },
     },
     { name: "의존성", run: ensureDependencies },
     { name: "DB", run: ensureDatabase },
-    { name: "실습 설정 폴더·.env·관찰 Hook", run: prepareConfig },
+    { name: "실습 설정 폴더·.env·관찰 Hook", run: () => prepareConfig(configDir) },
   ];
   if (!(await runSteps(SCRIPT, steps, 2, TOTAL_STEPS))) return 1;
   if (checkOnly) {
-    console.log(`\n--check 통과: 1~5단계가 준비됐습니다. claude는 띄우지 않았습니다. 시작은 node start.mjs`);
+    console.log(`\n--check 통과: 실행 전 단계가 모두 준비됐습니다. claude는 띄우지 않았습니다. 시작은 node start.mjs`);
     return 0;
   }
-  return launchClaude(claude, claudeArgs);
+  return launchClaude(claude, configDir, claudeArgs);
 }
