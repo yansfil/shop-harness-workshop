@@ -18,6 +18,24 @@ import { TrackingPage, trackingLoader } from "./legacy/tracking-page.tsx";
 import { ShipmentsPage, shipmentsLoader } from "./legacy/shipments-page.tsx";
 import { MyReturnsPage, ReturnFormPage, myReturnsLoader, returnFormLoader } from "./legacy/returns-pages.tsx";
 import { NotificationsPage, notificationsLoader } from "./legacy/notifications-page.tsx";
+import {
+  BreakdownPage,
+  DailySettlementPage,
+  MonthlySettlementPage,
+  PaymentsPage,
+  PayoutsPage,
+  breakdownLoader,
+  dailyLoader,
+  monthlyLoader,
+  paymentsLoader,
+  payoutsLoader,
+} from "./legacy/admin/settlement-pages.tsx";
+import { AdminCouponsPage, adminCouponsLoader } from "./legacy/admin/coupon-page.tsx";
+import { AdminPointsPage, adminPointsLoader } from "./legacy/admin/points-admin-page.tsx";
+import { AdminShipmentsPage, adminShipmentsLoader } from "./legacy/admin/shipments-admin-page.tsx";
+import { AdminReturnsPage, adminReturnsLoader } from "./legacy/admin/returns-admin-page.tsx";
+import { QueuePage, queueLoader } from "./legacy/admin/queue-page.tsx";
+import { BatchPage, batchLoader } from "./legacy/admin/batch-page.tsx";
 import { ProductPage, productLoader } from "./routes/product-page.tsx";
 import { RootError, RootFallback, logoutAction, logoutLoader, rootLoader } from "./routes/root.tsx";
 import { SearchPage, searchLoader } from "./routes/search-page.tsx";
@@ -65,6 +83,17 @@ export const routes: RouteObject[] = [
           { path: "orders", element: <AdminOrdersPage />, loader: adminOrdersLoader },
           { path: "orders/:orderId", element: <AdminOrderPage />, loader: adminOrderLoader },
           { path: "inventory", element: <AdminInventoryPage />, loader: inventoryLoader },
+          { path: "settlements", element: <DailySettlementPage />, loader: dailyLoader },
+          { path: "settlements/monthly", element: <MonthlySettlementPage />, loader: monthlyLoader },
+          { path: "settlements/breakdown", element: <BreakdownPage />, loader: breakdownLoader },
+          { path: "settlements/payouts", element: <PayoutsPage />, loader: payoutsLoader },
+          { path: "settlements/payments", element: <PaymentsPage />, loader: paymentsLoader },
+          { path: "coupons", element: <AdminCouponsPage />, loader: adminCouponsLoader },
+          { path: "points", element: <AdminPointsPage />, loader: adminPointsLoader },
+          { path: "shipments", element: <AdminShipmentsPage />, loader: adminShipmentsLoader },
+          { path: "returns", element: <AdminReturnsPage />, loader: adminReturnsLoader },
+          { path: "notifications", element: <QueuePage />, loader: queueLoader },
+          { path: "batch", element: <BatchPage />, loader: batchLoader },
         ],
       },
       { path: "logout", loader: logoutLoader, action: logoutAction },

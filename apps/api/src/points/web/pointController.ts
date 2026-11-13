@@ -32,6 +32,7 @@ export function registerPointRoutes(router: Router): void {
     wrap((_req, res) => {
       mustAdmin(res);
       const holders = topHolders(20).map((h: any) => ({
+        id: h.user_id,
         user: customerLabel(h),
         name: h.name,
         balance: toInt(h.balance),
