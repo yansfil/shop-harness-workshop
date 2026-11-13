@@ -26,7 +26,7 @@
   --color-on-dark: #ffffff;
   --color-scrim: #14161a99;
 
-  /* 보조색 오트밀. 보조색은 이 두 토큰으로만 쓴다(D-44) */
+  /* 보조색 오트밀. 보조색은 이 두 토큰으로만 쓴다 */
   --color-accent: #d9c7a6;
   --color-accent-soft: color-mix(in srgb, var(--color-accent) 35%, var(--color-ground)); /* accent에서 파생, 값은 accent 하나에서만 정한다 */
 
