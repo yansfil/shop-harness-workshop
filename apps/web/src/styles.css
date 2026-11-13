@@ -1,0 +1,96 @@
+@import "tailwindcss";
+
+/*
+ * 톤 A 디자인 토큰 (doop 캔버스 M5j3KFGJtN 페이지 00).
+ * 화면의 색·간격·모서리·글자 크기는 여기 토큰에서만 온다. Tailwind 기본 팔레트·그림자는 지웠다.
+ * static이라 쓰지 않은 토큰도 CSS 변수(var(--color-ink) 등)로 모두 나온다.
+ */
+@theme static {
+  --color-*: initial;
+  --radius-*: initial;
+  --shadow-*: initial;
+  --inset-shadow-*: initial;
+  --drop-shadow-*: initial;
+  --text-shadow-*: initial;
+  --font-*: initial;
+  --text-*: initial;
+
+  /* 바탕·글자·선 */
+  --color-ground: #ffffff;
+  --color-canvas: #f3f3f0;
+  --color-ink: #14161a; /* 주색 */
+  --color-ink-2: #4a4e57;
+  --color-ink-3: #6b6f78;
+  --color-line: #e1e1dc;
+  --color-layer-edge: #d3d3cd;
+  --color-on-dark: #ffffff;
+  --color-scrim: #14161a99;
+
+  /* 보조색 오트밀. 보조색은 이 두 토큰으로만 쓴다(D-44) */
+  --color-accent: #d9c7a6;
+  --color-accent-soft: #f3ebdd;
+
+  /* 주문 상태 뱃지 */
+  --color-status-paid-bg: #e6e9ef;
+  --color-status-paid-text: #3a4455;
+  --color-status-preparing-bg: #fcefd2;
+  --color-status-preparing-text: #7d5200;
+  --color-status-shipping-bg: #d9eef4;
+  --color-status-shipping-text: #0b5668;
+  --color-status-delivered-bg: #dcf0e3;
+  --color-status-delivered-text: #1c6340;
+
+  /* 품절·오류 */
+  --color-soldout-bg: #ececea;
+  --color-soldout-text: #5a5e66;
+  --color-danger: #b3261e;
+  --color-danger-soft: #fcebea;
+
+  /* 모서리: 2~4px, 칩만 pill. 그림자는 없고 1px 테두리(border-line)로 나눈다 */
+  --radius-sm: 2px;
+  --radius-md: 4px;
+  --radius-pill: 999px;
+
+  /* 간격: 4px 단위(p-1=4px, p-2=8px, p-3=12px, p-4=16px, p-6=24px, p-8=32px). 상품 그리드는 데스크톱 5열·gap-3(12px) */
+  --spacing: 4px;
+
+  --font-sans: "Pretendard Variable", "Pretendard", "Apple SD Gothic Neo", sans-serif;
+  --font-mono: ui-monospace, "SFMono-Regular", "Consolas", monospace;
+
+  /* 글자 크기. 이름은 doop 토큰 그대로다(3xl=28px이 2xl=32px보다 작다) */
+  --text-2xs: 10px;
+  --text-xs: 12px;
+  --text-xs-plus: 13px;
+  --text-sm: 14px;
+  --text-base: 16px;
+  --text-lg: 20px;
+  --text-logo-m: 22px;
+  --text-xl: 24px;
+  --text-3xl: 28px;
+  --text-logo: 30px;
+  --text-2xl: 32px;
+  --text-price-xl: 40px;
+}
+
+@font-face {
+  font-family: "Pretendard Variable";
+  font-weight: 45 920;
+  font-style: normal;
+  font-display: swap;
+  src: url("./assets/fonts/PretendardVariable.woff2") format("woff2-variations");
+}
+
+@layer base {
+  html {
+    font-family: var(--font-sans);
+    color: var(--color-ink);
+    background-color: var(--color-canvas);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  *,
+  ::before,
+  ::after {
+    border-color: var(--color-line);
+  }
+}
