@@ -25,7 +25,9 @@ import { summarize } from "./orders-pages.tsx";
 const FLOW: OrderStatus[] = ["paid", "preparing", "shipping", "delivered"];
 
 function nextOf(status: OrderStatus): OrderStatus | null {
-  return FLOW[FLOW.indexOf(status) + 1] ?? null;
+  const index = FLOW.indexOf(status);
+  // 취소된 주문처럼 흐름 밖의 상태에는 다음 단계가 없다.
+  return index === -1 ? null : (FLOW[index + 1] ?? null);
 }
 
 function without<T>(set: ReadonlySet<T>, value: T): Set<T> {
@@ -326,7 +328,7 @@ function AdminOrderView({ initial }: { initial: AdminOrderDetail }) {
               <p className="mt-3 text-xs-plus text-ink-3">상태는 다음 단계로만 바꿀 수 있어요</p>
             </>
           ) : (
-            <p className="mt-6 text-sm font-semibold text-ink-2">배송이 완료된 주문이에요</p>
+            <p className="mt-6 text-sm font-semibold text-ink-2">{order.status === "cancelled" ? "고객이 취소한 주문이에요" : "배송이 완료된 주문이에요"}</p>
           )}
           {error !== null && (
             <p role="alert" className="mt-3 rounded-sm bg-danger-soft px-3 py-2 text-xs-plus font-semibold text-danger">

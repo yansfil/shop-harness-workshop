@@ -5,6 +5,7 @@ const TONES: Record<OrderStatus, string> = {
   preparing: "bg-status-preparing-bg text-status-preparing-text",
   shipping: "bg-status-shipping-bg text-status-shipping-text",
   delivered: "bg-status-delivered-bg text-status-delivered-text",
+  cancelled: "bg-soldout-bg text-soldout-text",
 };
 
 export function StatusBadge({ status, className = "" }: { status: OrderStatus; className?: string }) {

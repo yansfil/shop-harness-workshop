@@ -20,17 +20,17 @@ export type InventoryListResponse = z.infer<typeof InventoryListResponseSchema>;
 
 export const InventoryParamsSchema = z.object({ productId: z.coerce.number().int().positive() });
 
-export const MovementKindSchema = z.enum(["inbound", "outbound"]);
+export const MovementKindSchema = z.enum(["inbound", "outbound", "restock"]);
 export type MovementKind = z.infer<typeof MovementKindSchema>;
-export const MOVEMENT_KIND_LABELS: Record<MovementKind, string> = { inbound: "입고", outbound: "출고" };
+export const MOVEMENT_KIND_LABELS: Record<MovementKind, string> = { inbound: "입고", outbound: "출고", restock: "취소 복구" };
 
 export const InventoryMovementSchema = z.object({
   id: IdSchema,
   kind: MovementKindSchema,
-  /** 부호 있는 변화량(입고 +, 출고 -) */
+  /** 부호 있는 변화량(입고·취소 복구 +, 출고 -) */
   quantityDelta: z.number().int(),
   quantityAfter: z.number().int().nonnegative(),
-  /** 주문 출고면 그 주문 번호 */
+  /** 주문 출고·취소 복구면 그 주문 번호 */
   orderNumber: z.string().nullable(),
   memo: z.string().nullable(),
   /** 입고를 등록한 관리자 이름 */

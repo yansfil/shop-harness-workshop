@@ -2,12 +2,14 @@ import type { AdminOrderListResponse, AdminOrderResponse, OrderDetail, OrderQuot
 import type { AdminOrderView } from "../application/admin-order-service.ts";
 import type { Quote } from "../application/order-service.ts";
 import type { AdminOrderRow, Order } from "../domain/order.ts";
+import { canCancel } from "../domain/order-status.ts";
 
 export function toOrderDetailDto(order: Order): OrderDetail {
   return {
     id: order.id,
     orderNumber: order.number,
     status: order.status,
+    cancellable: canCancel(order.status),
     items: order.items.map((item) => ({
       productId: item.productId,
       productName: item.productName,

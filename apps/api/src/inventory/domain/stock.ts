@@ -22,13 +22,13 @@ export function isLowStock(item: Pick<InventoryItem, "quantity" | "safetyStock">
   return item.quantity < item.safetyStock;
 }
 
-export type MovementKind = "inbound" | "outbound";
+export type MovementKind = "inbound" | "outbound" | "restock";
 
 export interface StockMovement {
   id: number;
   productId: number;
   kind: MovementKind;
-  /** 입고 +, 출고 - */
+  /** 입고·취소 복구 +, 출고 - */
   quantityDelta: number;
   quantityAfter: number;
   orderNumber: string | null;

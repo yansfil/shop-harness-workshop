@@ -213,7 +213,7 @@ function History({ item, version }: { item: InventoryItem | null; version: numbe
 }
 
 function MovementRow({ movement }: { movement: InventoryMovement }) {
-  const inbound = movement.kind === "inbound";
+  const increase = movement.quantityDelta > 0;
   return (
     <li className="flex items-center justify-between gap-3 border-b border-line px-4 py-3 last:border-b-0">
       <div className="min-w-0">
@@ -225,8 +225,8 @@ function MovementRow({ movement }: { movement: InventoryMovement }) {
           재고 {movement.quantityAfter}개{movement.memo !== null && ` · ${movement.memo}`}
         </p>
       </div>
-      <span className={`shrink-0 text-lg font-extrabold ${inbound ? "text-status-delivered-text" : "text-ink"}`}>
-        {inbound ? "+" : ""}
+      <span className={`shrink-0 text-lg font-extrabold ${increase ? "text-status-delivered-text" : "text-ink"}`}>
+        {increase ? "+" : ""}
         {movement.quantityDelta}
       </span>
     </li>

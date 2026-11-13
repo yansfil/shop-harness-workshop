@@ -31,6 +31,8 @@ export const ErrorCodeSchema = z.enum([
   "INSUFFICIENT_STOCK",
   /** 409 허용되지 않은 주문 상태 전이. */
   "INVALID_STATUS_TRANSITION",
+  /** 409 취소할 수 없는 상태의 주문이다(배송중·배송완료). 주문과 재고는 바뀌지 않는다. */
+  "ORDER_NOT_CANCELLABLE",
   /** 409 같은 멱등 키로 다른 내용의 요청을 보냈다. */
   "IDEMPOTENCY_KEY_REUSED",
   /** 500 서버 오류. 자세한 내용은 서버 로그에만 남는다. */

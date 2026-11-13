@@ -1,8 +1,11 @@
 import { z } from "zod";
 import { DateTimeSchema, IdempotencyKeySchema, IdSchema, MoneySchema, StockShortageSchema } from "./common.ts";
 
-/** 주문 상태. 다음 단계로만 넘어간다: paid → preparing → shipping → delivered */
-export const OrderStatusSchema = z.enum(["paid", "preparing", "shipping", "delivered"]);
+/**
+ * 주문 상태. 관리자는 다음 단계로만 넘긴다: paid → preparing → shipping → delivered.
+ * cancelled는 고객이 결제완료·배송준비 주문을 취소하면 되는 끝 상태다.
+ */
+export const OrderStatusSchema = z.enum(["paid", "preparing", "shipping", "delivered", "cancelled"]);
 export type OrderStatus = z.infer<typeof OrderStatusSchema>;
 
 /** 화면 표기와 순서 */
@@ -11,6 +14,7 @@ export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
   preparing: "배송준비",
   shipping: "배송중",
   delivered: "배송완료",
+  cancelled: "주문취소",
 };
 
 /** 결제 수단은 하나뿐이다. 화면 표기: "교육용 가상 결제" */
@@ -96,6 +100,8 @@ export const OrderDetailSchema = z.object({
   /** 화면 표기용 주문 번호. 예: GM-20261114-0001 */
   orderNumber: z.string(),
   status: OrderStatusSchema,
+  /** 지금 고객이 취소할 수 있는 주문인지(결제완료·배송준비). 서버가 정하고 화면은 그대로 쓴다. */
+  cancellable: z.boolean(),
   items: z.array(OrderItemSchema),
   subtotal: MoneySchema,
   shippingFee: MoneySchema,
@@ -131,6 +137,13 @@ export const OrderParamsSchema = z.object({ orderId: z.coerce.number().int().pos
 
 // GET /api/orders/:orderId (고객 로그인 필요) → OrderResponseSchema. 남의 주문이면 404 NOT_FOUND.
 
+/**
+ * POST /api/orders/:orderId/cancel (고객 로그인 필요, 본문 없음) → OrderResponseSchema.
+ * 결제완료·배송준비 주문만 취소되고, 주문 수량만큼 재고가 되돌아오며 입출고 이력에 restock 줄이 남는다.
+ * 이미 취소된 주문을 다시 보내면 200과 같은 주문(재고는 한 번만 늘어난다).
+ * 실패: 401 UNAUTHENTICATED, 403 FORBIDDEN(관리자), 404 NOT_FOUND(남의 주문 포함), 409 ORDER_NOT_CANCELLABLE(배송중·배송완료).
+ */
+
 // ---- 관리자 ----
 
 export const AdminOrderRowSchema = z.object({
@@ -155,7 +168,7 @@ export type AdminOrderListResponse = z.infer<typeof AdminOrderListResponseSchema
 
 export const AdminOrderDetailSchema = OrderDetailSchema.extend({
   customer: z.object({ id: IdSchema, name: z.string(), email: z.string() }),
-  /** 넘길 수 있는 다음 상태. 배송완료면 null */
+  /** 넘길 수 있는 다음 상태. 배송완료·취소면 null */
   nextStatus: OrderStatusSchema.nullable(),
 });
 export type AdminOrderDetail = z.infer<typeof AdminOrderDetailSchema>;
@@ -167,7 +180,7 @@ export type AdminOrderResponse = z.infer<typeof AdminOrderResponseSchema>;
 /**
  * POST /api/admin/orders/:orderId/status (관리자) → AdminOrderResponseSchema.
  * status가 바로 다음 단계면 넘긴다. 이미 그 상태면 아무것도 바꾸지 않고 200(다시 보내도 같은 결과).
- * 그 밖의 전이는 409 INVALID_STATUS_TRANSITION.
+ * 그 밖의 전이는 cancelled 포함 409 INVALID_STATUS_TRANSITION. 취소는 고객의 취소 요청으로만 한다.
  */
 export const ChangeOrderStatusRequestSchema = z.object({ status: OrderStatusSchema });
 export type ChangeOrderStatusRequest = z.infer<typeof ChangeOrderStatusRequestSchema>;

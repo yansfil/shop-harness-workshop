@@ -47,6 +47,7 @@ export const ENDPOINTS = {
   createOrder: { method: "POST", path: ROUTES.orders, access: "customer", body: CreateOrderRequestSchema, response: OrderResponseSchema },
   listMyOrders: { method: "GET", path: ROUTES.orders, access: "customer", response: MyOrderListResponseSchema },
   getMyOrder: { method: "GET", path: ROUTES.order, access: "customer", params: OrderParamsSchema, response: OrderResponseSchema },
+  cancelMyOrder: { method: "POST", path: ROUTES.orderCancel, access: "customer", params: OrderParamsSchema, response: OrderResponseSchema },
 
   listAdminOrders: { method: "GET", path: ROUTES.adminOrders, access: "admin", response: AdminOrderListResponseSchema },
   getAdminOrder: { method: "GET", path: ROUTES.adminOrder, access: "admin", params: OrderParamsSchema, response: AdminOrderResponseSchema },

@@ -1,7 +1,6 @@
 import {
   type MyOrderListResponse,
   OrderParamsSchema,
-  type OrderResponse,
   ROUTES,
 } from "@grabmarket/contracts";
 import type { Router } from "express";
@@ -9,6 +8,7 @@ import { notFound } from "../../shared/domain/domain-error.ts";
 import type { Controller } from "../../shared/web/controller.ts";
 import { requireCustomer } from "../../shared/web/session.ts";
 import type { OrderRepository } from "../domain/order.ts";
+import { toOrderResponse } from "./order-mapper.ts";
 
 export class MyOrderController implements Controller {
   readonly #orders: OrderRepository;
@@ -45,29 +45,7 @@ export class MyOrderController implements Controller {
       const { orderId } = OrderParamsSchema.parse(req.params);
       const order = this.#orders.findForCustomer(user.id, orderId);
       if (order === undefined) throw notFound("주문");
-      const body: OrderResponse = {
-        order: {
-          id: order.id,
-          orderNumber: order.number,
-          status: order.status,
-          items: order.items.map((item) => ({
-            productId: item.productId,
-            productName: item.productName,
-            imageUrl: item.imagePath,
-            unitPrice: item.unitPrice,
-            quantity: item.quantity,
-            lineTotal: item.lineTotal,
-          })),
-          subtotal: order.subtotal,
-          shippingFee: order.shippingFee,
-          total: order.total,
-          paymentMethod: order.paymentMethod,
-          shipping: order.shipping,
-          createdAt: order.createdAt.toISOString(),
-          updatedAt: order.updatedAt.toISOString(),
-        },
-      };
-      res.json(body);
+      res.json(toOrderResponse(order));
     });
   }
 }

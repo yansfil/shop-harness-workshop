@@ -7,6 +7,7 @@ export type DomainErrorCode =
   | "NOT_FOUND"
   | "INSUFFICIENT_STOCK"
   | "INVALID_STATUS_TRANSITION"
+  | "ORDER_NOT_CANCELLABLE"
   | "IDEMPOTENCY_KEY_REUSED";
 
 export interface StockShortage {

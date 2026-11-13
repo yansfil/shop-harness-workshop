@@ -3,8 +3,9 @@ import type { CatalogService } from "../../catalog/application/catalog-service.t
 import type { InventoryService } from "../../inventory/application/inventory-service.ts";
 import { InsufficientStockError, type StockLine, type StockShortage } from "../../inventory/domain/stock.ts";
 import type { UnitOfWork } from "../../shared/application/unit-of-work.ts";
-import { DomainError } from "../../shared/domain/domain-error.ts";
+import { DomainError, notFound } from "../../shared/domain/domain-error.ts";
 import type { SessionUser } from "../../shared/domain/session-user.ts";
+import { cancelStatus } from "../domain/order-status.ts";
 import {
   type CartLine,
   formatOrderNumber,
@@ -78,6 +79,25 @@ export class OrderService {
       const shortages = this.#inventory.decreaseForOrder(order.id, stockLines(priced));
       if (shortages.length > 0) throw new InsufficientStockError(shortages);
       return { created: true, order };
+    });
+  }
+
+  /**
+   * 내 주문을 취소한다: 취소 가능한 상태인지 확인 → 재고 복구 → 상태 저장을 한 트랜잭션으로 한다.
+   * 이미 취소된 주문이면 아무것도 바꾸지 않고 그 주문을 돌려준다(재고는 한 번만 늘어난다).
+   * 남의 주문은 없는 주문처럼 404다.
+   */
+  cancel(buyer: SessionUser, orderId: number): Order {
+    return this.#uow.run(() => {
+      const order = this.#orders.findForCustomer(buyer.id, orderId);
+      if (order === undefined) throw notFound("주문");
+      if (order.status === "cancelled") return order;
+      const cancelled = cancelStatus(order.status);
+      this.#inventory.restoreForOrder(order.id, stockLines(order));
+      this.#orders.saveStatus(order.id, cancelled, this.#clock.now());
+      const saved = this.#orders.findById(order.id);
+      if (saved === undefined) throw new Error("방금 취소한 주문을 읽지 못했습니다");
+      return saved;
     });
   }
 

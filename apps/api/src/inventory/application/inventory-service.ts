@@ -85,6 +85,34 @@ export class InventoryService {
     });
   }
 
+  /**
+   * 취소한 주문의 재고를 모두 되돌리고 줄마다 취소 복구 이력을 남긴다. 주문 취소 트랜잭션 안에서 부른다.
+   * 같은 주문에 두 번 부르면 두 번 늘어나므로, 한 번만 부르는 일은 부르는 쪽(주문 서비스)이 상태로 지킨다.
+   */
+  restoreForOrder(orderId: number, lines: StockLine[]): void {
+    this.#uow.run(() => {
+      const quantities = this.#inventory.quantities(lines.map((line) => line.productId));
+      const at = this.#clock.now();
+      for (const line of lines) {
+        const current = quantities.get(line.productId);
+        if (current === undefined) throw new Error(`재고 행이 없는 상품입니다: ${String(line.productId)}`);
+        const after = current + line.quantity;
+        this.#inventory.setQuantity(line.productId, after, at);
+        this.#inventory.insertMovement({
+          productId: line.productId,
+          kind: "restock",
+          quantityDelta: line.quantity,
+          quantityAfter: after,
+          orderId,
+          memo: null,
+          idempotencyKey: null,
+          createdBy: null,
+          createdAt: at,
+        });
+      }
+    });
+  }
+
   /** 입고를 등록한다. 같은 키로 다시 보내면 수량을 다시 늘리지 않고 처음 결과를 돌려준다. */
   registerInbound(admin: SessionUser, productId: number, request: InboundRequest): InboundResult {
     return this.#uow.run(() => {
