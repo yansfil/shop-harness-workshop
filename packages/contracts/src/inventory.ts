@@ -5,7 +5,7 @@ export const InventoryItemSchema = z.object({
   productId: IdSchema,
   productName: z.string(),
   categoryName: z.string(),
-  quantity: z.number().int().nonnegative(),
+  quantity: z.number().int(),
   updatedAt: DateTimeSchema,
 });
 export type InventoryItem = z.infer<typeof InventoryItemSchema>;
@@ -25,7 +25,7 @@ export const InventoryMovementSchema = z.object({
   kind: MovementKindSchema,
   /** 부호 있는 변화량(입고 +, 출고 -) */
   quantityDelta: z.number().int(),
-  quantityAfter: z.number().int().nonnegative(),
+  quantityAfter: z.number().int(),
   /** 주문 출고면 그 주문 번호 */
   orderNumber: z.string().nullable(),
   memo: z.string().nullable(),
