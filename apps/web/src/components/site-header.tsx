@@ -123,13 +123,16 @@ function UtilityLink({ to, children }: { to: string; children: ReactNode }) {
  */
 function UtilityBar({ user }: { user: CurrentUser | null }) {
   const location = useLocation();
+  const here = location.pathname + location.search;
+  // 로그인 화면에서는 지금 주소(돌아갈 next가 이미 붙어 있음)를 그대로 쓴다. 다시 감싸면 로그인 뒤 로그인 화면으로 돌아온다.
+  const loginHref = location.pathname === "/login" ? here : loginPath(here);
   return (
     <div className="border-b border-line bg-ground max-md:hidden">
       <nav aria-label="이용 안내" className="mx-auto flex h-8.5 max-w-360 justify-end px-8">
         <ul className="flex items-center">
           {user === null ? (
             <li className={utilityItem}>
-              <Link to={loginPath(location.pathname + location.search)} className="text-ink-2">
+              <Link to={loginHref} className="text-ink-2">
                 로그인
               </Link>
             </li>

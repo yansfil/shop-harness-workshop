@@ -31,6 +31,12 @@ describe("머리 맨 위 메뉴 줄", () => {
     expect(within(nav).getByRole("link", { name: "고객센터" })).toHaveAttribute("href", "/help");
   });
 
+  it("로그인 화면에서 맨 위 로그인 링크는 next를 겹치지 않고 지금 주소 그대로다", async () => {
+    renderApp("/login?next=%2Forders");
+    await topLine();
+    expect(within(screen.getByRole("navigation", { name: "이용 안내" })).getByRole("link", { name: "로그인" })).toHaveAttribute("href", "/login?next=%2Forders");
+  });
+
   it("고객 로그인 뒤에는 이름님(링크 아님), 로그아웃, 주문배송, 장바구니, 고객센터 순서이고 로고 줄에 이름 버튼이 없다", async () => {
     signIn(CUSTOMER);
     renderApp("/");
