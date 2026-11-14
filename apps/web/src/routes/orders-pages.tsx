@@ -1,5 +1,5 @@
 import { type OrderDetail, type OrderSummary, OrderParamsSchema, PAYMENT_METHOD_LABELS } from "@grabmarket/contracts";
-import { Link, type LoaderFunctionArgs, useLoaderData } from "react-router";
+import { Form, Link, type LoaderFunctionArgs, useLoaderData } from "react-router";
 import { streamed } from "../lib/streamed.ts";
 import { callApi } from "../api/client.ts";
 import { LinkButton } from "../components/button.tsx";
@@ -59,7 +59,26 @@ export function MyOrdersPage() {
           </>
         )}
       </Loaded>
+      <MobileFooter />
     </Page>
+  );
+}
+
+/** 모바일 머리에는 맨 위 메뉴 줄이 없어서 내 주문 맨 아래에 고객센터와 로그아웃을 둔다(모바일만). */
+function MobileFooter() {
+  const item = "flex h-9 items-center px-3.5 text-sm font-semibold text-ink-2";
+  return (
+    <nav aria-label="내 주문 아래 메뉴" className="mt-6 flex items-center justify-center md:hidden">
+      <Link to="/help" className={item}>
+        고객센터
+      </Link>
+      <span aria-hidden="true" className="h-3 w-px bg-line" />
+      <Form method="post" action="/logout">
+        <button type="submit" className={item}>
+          로그아웃
+        </button>
+      </Form>
+    </nav>
   );
 }
 
