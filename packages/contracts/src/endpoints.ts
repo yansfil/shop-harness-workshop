@@ -2,6 +2,7 @@ import type { z } from "zod";
 import { CategoryListResponseSchema, ProductDetailResponseSchema, ProductParamsSchema, ProductSearchQuerySchema, ProductSearchResponseSchema, ProductSuggestQuerySchema, ProductSuggestResponseSchema } from "./catalog.ts";
 import { LoginRequestSchema, MeResponseSchema } from "./auth.ts";
 import { HealthResponseSchema } from "./common.ts";
+import { EventDetailResponseSchema, EventListResponseSchema, EventParamsSchema } from "./events.ts";
 import { InboundRequestSchema, InboundResponseSchema, InventoryListResponseSchema, InventoryMovementsResponseSchema, InventoryParamsSchema } from "./inventory.ts";
 import {
   AdminOrderListQuerySchema,
@@ -44,6 +45,9 @@ export const ENDPOINTS = {
   searchProducts: { method: "GET", path: ROUTES.products, access: "public", query: ProductSearchQuerySchema, response: ProductSearchResponseSchema },
   suggestProducts: { method: "GET", path: ROUTES.productSuggest, access: "public", query: ProductSuggestQuerySchema, response: ProductSuggestResponseSchema },
   getProduct: { method: "GET", path: ROUTES.product, access: "public", params: ProductParamsSchema, response: ProductDetailResponseSchema },
+
+  listEvents: { method: "GET", path: ROUTES.events, access: "public", response: EventListResponseSchema },
+  getEvent: { method: "GET", path: ROUTES.event, access: "public", params: EventParamsSchema, response: EventDetailResponseSchema },
 
   quoteOrder: { method: "POST", path: ROUTES.orderQuote, access: "public", body: OrderQuoteRequestSchema, response: OrderQuoteResponseSchema },
   createOrder: { method: "POST", path: ROUTES.orders, access: "customer", body: CreateOrderRequestSchema, response: OrderResponseSchema },

@@ -10,6 +10,7 @@ import type {
   ProductVariant,
   SearchCriteria,
   SuggestMatches,
+  VariantRef,
 } from "../domain/product.ts";
 
 interface ProductRow {
@@ -141,6 +142,16 @@ export class SqliteCatalogRepository implements CatalogRepository {
     if (ids.length === 0) return [];
     const placeholders = ids.map(() => "?").join(", ");
     return selectAll<ProductRow>(this.#db, `${PRODUCT_SELECT} WHERE p.id IN (${placeholders})`, ...ids).map(toProduct);
+  }
+
+  findByVariants(refs: readonly VariantRef[]): Product[] {
+    if (refs.length === 0) return [];
+    const conditions = refs.map(() => "(p.base_key = ? AND p.option_label = ?)").join(" OR ");
+    return selectAll<ProductRow>(
+      this.#db,
+      `${PRODUCT_SELECT} WHERE ${conditions}`,
+      ...refs.flatMap((ref) => [ref.baseKey, ref.optionLabel]),
+    ).map(toProduct);
   }
 
   findVariants(baseKey: string): ProductVariant[] {
