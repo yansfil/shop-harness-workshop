@@ -29,7 +29,7 @@ export function calculateShippingFee(subtotal: Money): Money { ... }
 | `apps/web/src/lib/use-quote.ts`, `components/summary-box.tsx` | 화면은 견적 응답의 값(남은 금액 `freeShippingRemaining` 포함)을 그대로 보인다. 장바구니·주문서가 같은 조각을 쓴다. 상품 상세는 견적의 배송비 값을 보이고, 무료 기준 금액은 "배송과 교환 안내" 탭이 `/api/shipping-policy` 값으로 보인다 |
 | `apps/api/src/orders/application/shipping-policy.ts`, `orders/web/shipping-policy-controller.ts` | `GET /api/shipping-policy`가 배송비와 무료 기준 두 상수를 그대로 내린다 |
 | `packages/contracts/src/shipping.ts` | 배송 규칙 응답(`fee`, `freeThreshold`)의 계약 |
-| `apps/web/src/components/product-tabs.tsx` | 상품 상세 "배송과 교환 안내" 탭이 `/api/shipping-policy` 값으로 배송비 문구를 만든다 |
+| `apps/web/src/components/shipping-fee.tsx` | `/api/shipping-policy` 값으로 배송비 문구를 만든다. 상품 상세 "배송 안내" 탭(`components/product-tabs.tsx`)과 고객센터(`/help`, `routes/help-page.tsx`)가 같이 쓴다 |
 | `apps/web/src/routes/orders-pages.tsx`, `admin-orders-pages.tsx` | 주문 상세에서 저장된 배송비를 보인다 |
 | `apps/api/src/seed/seed-database.ts`, `order-simulator.ts` | 시드 주문과 시뮬레이터 주문도 같은 주문 서비스를 거치므로 규칙이 바뀌면 `npm run db:reset`으로 만든 주문 금액이 달라진다 |
 

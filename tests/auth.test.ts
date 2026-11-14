@@ -24,7 +24,7 @@ describe("로그인", () => {
     }
   });
 
-  it("로그아웃하면 세션이 끝나고, 8시간이 지나도 세션이 끝난다", async () => {
+  it("로그아웃하면 세션이 끝나고, 12시간이 지나도 세션이 끝난다", async () => {
     const { app, clock } = createTestApp();
     const agent = request.agent(app);
     await agent.post(ROUTES.login).send({ email: ACCOUNT.customerA, password: PASSWORD }).expect(200);
@@ -32,7 +32,7 @@ describe("로그인", () => {
     await agent.get(ROUTES.me).expect(401);
 
     await agent.post(ROUTES.login).send({ email: ACCOUNT.customerA, password: PASSWORD }).expect(200);
-    clock.advance(8 * 60 * 60 * 1000 - 1);
+    clock.advance(12 * 60 * 60 * 1000 - 1);
     await agent.get(ROUTES.me).expect(200);
     clock.advance(1);
     const expired = await agent.get(ROUTES.me).expect(401);
