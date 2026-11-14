@@ -1,5 +1,6 @@
 import { DomainError, notFound } from "../../shared/domain/domain-error.ts";
 import type { Category, CategoryCount, CatalogRepository, Product, ProductVariant, SearchCriteria, VariantRef } from "../domain/product.ts";
+import type { ProductStory, ProductStoryRepository } from "../domain/product-story.ts";
 import { suggestCategory } from "../domain/suggest.ts";
 
 export interface SearchResult {
@@ -12,16 +13,24 @@ export interface SuggestResult {
   products: { id: number; name: string }[];
 }
 
+export interface ProductDetailVariant extends ProductVariant {
+  /** 옵션마다 한 줄 */
+  note: string;
+}
+
 export interface ProductDetail {
   product: Product;
-  variants: ProductVariant[];
+  variants: ProductDetailVariant[];
+  story: ProductStory;
 }
 
 export class CatalogService {
   readonly #catalog: CatalogRepository;
+  readonly #stories: ProductStoryRepository;
 
-  constructor(catalog: CatalogRepository) {
+  constructor(catalog: CatalogRepository, stories: ProductStoryRepository) {
     this.#catalog = catalog;
+    this.#stories = stories;
   }
 
   listCategories(): Category[] {
@@ -37,10 +46,18 @@ export class CatalogService {
     return { category: suggestCategory(q, this.#catalog.listCategories(), matches.categorySlugs), products: matches.products };
   }
 
+  /** 없는 상품은 NOT_FOUND. 상품에 글이나 옵션 한 줄이 없으면 데이터가 어긋난 것이라 오류로 올린다. */
   getProduct(id: number): ProductDetail {
     const product = this.#catalog.findById(id);
     if (product === undefined) throw notFound("상품");
-    return { product, variants: this.#catalog.findVariants(product.baseKey) };
+    const story = this.#stories.findByBaseKey(product.baseKey);
+    if (story === undefined) throw new Error(`상품 상세 글이 없습니다: ${product.baseKey}`);
+    const variants = this.#catalog.findVariants(product.baseKey).map((variant) => {
+      const note = story.variantNotes[variant.optionLabel ?? ""];
+      if (note === undefined) throw new Error(`옵션 한 줄이 없습니다: ${product.baseKey} ${variant.optionLabel ?? "(옵션 없음)"}`);
+      return { ...variant, note };
+    });
+    return { product, variants, story };
   }
 
   /** 기획전이 쓰는 조회: 모든 상품이 있어야 한다. 요청 순서대로 돌려준다. 없는 상품은 데이터가 어긋난 것이라 오류로 올린다. */

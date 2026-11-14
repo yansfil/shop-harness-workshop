@@ -14,6 +14,7 @@ export const ROUTES = {
   events: "/api/events",
   event: "/api/events/:slug",
 
+  shippingPolicy: "/api/shipping-policy",
   orderQuote: "/api/orders/quote",
   orders: "/api/orders",
   order: "/api/orders/:orderId",
