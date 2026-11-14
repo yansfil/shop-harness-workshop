@@ -30,7 +30,7 @@ export const ProductSummarySchema = z.object({
   optionLabel: z.string().nullable(),
   category: z.object({ slug: CategorySlugSchema, name: z.string() }),
   price: MoneySchema,
-  /** 예: /images/products/jeju-tangerine.webp (같은 기본 상품의 변형은 같은 이미지) */
+  /** 예: /images/products/jeju-tangerine-2.webp (변형마다 다른 이미지, 번호는 변형 순서) */
   imageUrl: z.string(),
   stockQuantity: z.number().int().nonnegative(),
   stockStatus: StockStatusSchema,
