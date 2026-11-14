@@ -7,7 +7,6 @@ import { SESSION_TTL_MS } from "../domain/session.ts";
 export interface LoginResult {
   token: string;
   user: SessionUser;
-  expiresAt: Date;
 }
 
 export class AuthService {
@@ -36,7 +35,7 @@ export class AuthService {
     const expiresAt = new Date(now.getTime() + SESSION_TTL_MS);
     this.#sessions.deleteExpired(now);
     this.#sessions.insert({ tokenHash: this.#tokens.hash(token), userId: record.user.id, createdAt: now, expiresAt });
-    return { token, user: record.user, expiresAt };
+    return { token, user: record.user };
   }
 
   /** 쿠키 토큰으로 사용자를 찾는다. 없거나 끝난 세션이면 undefined. */

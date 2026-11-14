@@ -1,7 +1,7 @@
 import { ApiErrorResponseSchema, MeResponseSchema, ROUTES, SESSION_COOKIE_NAME } from "@grabmarket/contracts";
 import request from "supertest";
-import { describe, expect, it } from "vitest";
-import { ACCOUNT, createTestApp, PASSWORD } from "./support/test-app.ts";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { ACCOUNT, createTestApp, NOW, PASSWORD } from "./support/test-app.ts";
 
 describe("로그인", () => {
   it("로그인하면 HttpOnly 세션 쿠키가 생기고 me가 같은 사용자를 돌려준다", async () => {
@@ -37,6 +37,24 @@ describe("로그인", () => {
     clock.advance(1);
     const expired = await agent.get(ROUTES.me).expect(401);
     expect(ApiErrorResponseSchema.parse(expired.body).error.code).toBe("UNAUTHENTICATED");
+  });
+
+  describe("테스트를 돌리는 컴퓨터 시각이 서버 Clock보다 며칠 뒤여도", () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("로그인 쿠키는 받은 때부터 12시간 수명으로 내려가 로그인이 유지된다", async () => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(new Date(new Date(NOW).getTime() + 3 * 24 * 60 * 60 * 1000));
+      const { app } = createTestApp();
+      const agent = request.agent(app);
+
+      const login = await agent.post(ROUTES.login).send({ email: ACCOUNT.customerA, password: PASSWORD }).expect(200);
+
+      expect((login.headers["set-cookie"] as unknown as string[]).join(";")).toContain("Max-Age=43200");
+      await agent.get(ROUTES.me).expect(200);
+    });
   });
 
   it("형식이 틀린 요청은 400과 필드별 이유로 답한다", async () => {
