@@ -155,12 +155,12 @@ export class SqliteCatalogRepository implements CatalogRepository {
   }
 
   findVariants(baseKey: string): ProductVariant[] {
-    return selectAll<{ id: number; option_label: string | null; price: number; quantity: number }>(
+    return selectAll<{ id: number; option_label: string | null; price: number; image_path: string; quantity: number }>(
       this.#db,
-      `SELECT p.id, p.option_label, p.price, i.quantity
+      `SELECT p.id, p.option_label, p.price, p.image_path, i.quantity
          FROM products p JOIN inventory i ON i.product_id = p.id
         WHERE p.base_key = ? ORDER BY p.price, p.id`,
       baseKey,
-    ).map((row) => ({ id: row.id, optionLabel: row.option_label, price: won(row.price), stockQuantity: row.quantity }));
+    ).map((row) => ({ id: row.id, optionLabel: row.option_label, price: won(row.price), imagePath: row.image_path, stockQuantity: row.quantity }));
   }
 }

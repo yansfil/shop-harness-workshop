@@ -5,4 +5,5 @@ export * from "./catalog.ts";
 export * from "./events.ts";
 export * from "./orders.ts";
 export * from "./inventory.ts";
+export * from "./shipping.ts";
 export * from "./endpoints.ts";
