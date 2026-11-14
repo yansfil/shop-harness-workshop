@@ -116,19 +116,19 @@ describe("상품 상세 탭", () => {
     expect(await screen.findByText("50,000원 이상 주문하면 무료, 그 밖에는 4,000원")).toBeInTheDocument();
   });
 
-  it("교환·반품 안내 글의 고객센터를 누르면 고객센터 화면으로 간다", async () => {
+  it("교환·반품 안내 글의 내 주문을 누르면 내 주문 화면으로 간다", async () => {
     const router = open(1);
     await userEvent.click(await screen.findByRole("tab", { name: "교환·반품 안내" }));
     const panel = screen.getByRole("tabpanel");
 
     expect(within(panel).getAllByRole("row").map((row) => row.textContent)).toEqual([
-      "신청 기간받은 날부터 7일 안에 고객센터로 알려 주세요",
-      "안 되는 경우신선식품은 단순 변심으로 교환·반품할 수 없어요",
+      "신청 기간배송완료 뒤 7일 안에 내 주문 상세에서 신청해 주세요",
+      "주문 취소결제완료·배송준비 주문은 내 주문 상세에서 취소할 수 있어요",
+      "안 되는 경우배송완료 전이거나 취소된 주문은 교환·반품을 신청할 수 없어요",
     ]);
-    await userEvent.click(within(panel).getByRole("link", { name: "고객센터" }));
+    await userEvent.click(within(panel).getByRole("link", { name: "내 주문" }));
     await waitFor(() => {
-      expect(router.state.location.pathname).toBe("/help");
+      expect(router.state.location.pathname).toBe("/orders");
     });
-    expect(await screen.findByRole("heading", { level: 1, name: "고객센터" })).toBeInTheDocument();
   });
 });

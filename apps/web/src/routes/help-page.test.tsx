@@ -29,8 +29,9 @@ describe("고객센터", () => {
       "배송중",
       "배송완료",
     ]);
-    expect(rowText(/^신청 기간/)).toBe("신청 기간받은 날부터 7일 안에 알려 주세요");
-    expect(rowText(/^안 되는 경우/)).toBe("안 되는 경우신선식품은 단순 변심으로 교환·반품할 수 없어요");
+    expect(rowText(/^신청 기간/)).toBe("신청 기간배송완료 뒤 7일 안에 내 주문 상세에서 신청해 주세요");
+    expect(rowText(/^주문 취소/)).toBe("주문 취소결제완료·배송준비 주문은 내 주문 상세에서 취소할 수 있어요");
+    expect(rowText(/^안 되는 경우/)).toBe("안 되는 경우배송완료 전이거나 취소된 주문은 교환·반품을 신청할 수 없어요");
     expect(screen.getByRole("link", { name: "내 주문 보기" })).toHaveAttribute("href", "/orders");
     expect(screen.getByText("그랩마켓은 가상의 교육용 쇼핑몰이에요. 실제 결제와 배송은 이뤄지지 않아요.")).toBeInTheDocument();
     expect(screen.queryByText(/전화|상담 시간|1:1|회원가입|매장|최근 본/)).not.toBeInTheDocument();
