@@ -1,5 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import type { CurrentUser } from "@grabmarket/contracts";
+import type { ReactNode } from "react";
 import { Form, Link, NavLink, useLocation, useSearchParams } from "react-router";
+import { loginPath } from "../lib/login-path.ts";
 import { useCartLines } from "../state/cart.ts";
 import { useRootData } from "../state/root-data.ts";
 import { Icon } from "./icon.tsx";
@@ -14,7 +16,7 @@ export function Logo({ className = "" }: { className?: string }) {
 }
 
 /**
- * 고객 화면 머리: 로고·큰 검색창·내 주문·장바구니. 카테고리 줄(맨 끝이 기획전)은 데스크톱에서 항상, 모바일(375px)에서는 mobileCategories가 켜진
+ * 고객 화면 머리: 맨 위 작은 메뉴 줄(데스크톱만), 로고·큰 검색창·내 주문·장바구니. 카테고리 줄(맨 끝이 기획전)은 데스크톱에서 항상, 모바일(375px)에서는 mobileCategories가 켜진
  * 화면(홈·카테고리·검색 결과)에만 둔다.
  */
 export function SiteHeader({ mobileCategories }: { mobileCategories: boolean }) {
@@ -34,11 +36,11 @@ export function SiteHeader({ mobileCategories }: { mobileCategories: boolean }) 
 
   return (
     <header className="relative z-40">
+      <UtilityBar user={user} />
       <div className="border-b border-line bg-ground">
         <div className="mx-auto flex max-w-360 flex-wrap items-center px-4 md:h-20 md:flex-nowrap md:gap-8 md:px-8">
           <Logo className="order-1 flex h-14 items-center text-logo-m leading-7 md:h-auto md:w-33 md:text-logo md:leading-9" />
           <nav aria-label="내 메뉴" className="order-2 ml-auto flex h-14 items-center gap-4 md:order-3 md:h-auto md:gap-6">
-            {user !== null && <UserMenu key={location.key} name={user.name} admin={user.role === "admin"} />}
             <Link to="/orders" className="flex flex-col items-center gap-0.5 text-2xs font-semibold text-ink-2 md:text-xs">
               <Icon name="receipt" className="size-5.5 text-ink md:size-6" />내 주문
             </Link>
@@ -101,52 +103,59 @@ function CategoryLink({ to, active, children }: { to: string; active: boolean; c
   );
 }
 
-function UserMenu({ name, admin }: { name: string; admin: boolean }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+/** 항목 사이 얇은 세로선은 둘째 항목부터 왼쪽에 긋는다. */
+const utilityItem =
+  "relative px-2.5 text-xs leading-4 whitespace-nowrap last:pr-0 before:absolute before:top-0.75 before:left-0 before:h-2.5 before:w-px before:bg-line first:before:hidden";
 
-  useEffect(() => {
-    if (!open) return;
-    function onPointerDown(event: PointerEvent) {
-      if (ref.current !== null && event.target instanceof Node && !ref.current.contains(event.target)) setOpen(false);
-    }
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") setOpen(false);
-    }
-    document.addEventListener("pointerdown", onPointerDown);
-    document.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.removeEventListener("pointerdown", onPointerDown);
-      document.removeEventListener("keydown", onKeyDown);
-    };
-  }, [open]);
-
+function UtilityLink({ to, children }: { to: string; children: ReactNode }) {
   return (
-    <div ref={ref} className="relative max-md:hidden">
-      <button
-        type="button"
-        aria-haspopup="menu"
-        aria-expanded={open}
-        onClick={() => {
-          setOpen((value) => !value);
-        }}
-        className={`flex h-10 items-center gap-1 rounded-md border bg-ground pr-2 pl-3 text-sm leading-5 font-semibold text-ink ${open ? "border-ink" : "border-line"}`}
-      >
-        {name}님
-        <Icon name="expandMore" className="size-5" />
-      </button>
-      {open && (
-        <div role="menu" className="absolute top-[calc(100%+8px)] right-0 w-42 overflow-hidden rounded-md border border-layer-edge bg-ground">
-          <Link role="menuitem" to={admin ? "/admin/orders" : "/orders"} className="flex h-12 items-center px-4 text-sm font-semibold text-ink">
-            {admin ? "관리자 화면" : "내 주문"}
-          </Link>
-          <Form method="post" action="/logout">
-            <button role="menuitem" type="submit" className="flex h-12 w-full items-center border-t border-line px-4 text-sm font-semibold text-ink-2">
-              로그아웃
-            </button>
-          </Form>
-        </div>
-      )}
+    <li className={utilityItem}>
+      <NavLink to={to} className={({ isActive }) => (isActive ? "font-bold text-ink" : "text-ink-2")}>
+        {children}
+      </NavLink>
+    </li>
+  );
+}
+
+/**
+ * 머리 맨 위 작은 메뉴 줄(데스크톱만, 375px에서는 숨김). 순서는 정해져 있다.
+ * 로그인 전: 로그인, 주문배송, 장바구니, 고객센터 / 로그인 후: 이름님, (관리자는 관리자 화면,) 로그아웃, 주문배송, 장바구니, 고객센터
+ */
+function UtilityBar({ user }: { user: CurrentUser | null }) {
+  const location = useLocation();
+  const here = location.pathname + location.search;
+  // 로그인 화면에서는 지금 주소(돌아갈 next가 이미 붙어 있음)를 그대로 쓴다. 다시 감싸면 로그인 뒤 로그인 화면으로 돌아온다.
+  const loginHref = location.pathname === "/login" ? here : loginPath(here);
+  return (
+    <div className="border-b border-line bg-ground max-md:hidden">
+      <nav aria-label="이용 안내" className="mx-auto flex h-8.5 max-w-360 justify-end px-8">
+        <ul className="flex items-center">
+          {user === null ? (
+            <li className={utilityItem}>
+              <Link to={loginHref} className="text-ink-2">
+                로그인
+              </Link>
+            </li>
+          ) : (
+            <>
+              <li className={`${utilityItem} text-ink-2`}>
+                <b className="font-bold text-ink">{user.name}</b>님
+              </li>
+              {user.role === "admin" && <UtilityLink to="/admin/orders">관리자 화면</UtilityLink>}
+              <li className={utilityItem}>
+                <Form method="post" action="/logout" className="flex">
+                  <button type="submit" className="text-xs leading-4 text-ink-2">
+                    로그아웃
+                  </button>
+                </Form>
+              </li>
+            </>
+          )}
+          <UtilityLink to="/orders">주문배송</UtilityLink>
+          <UtilityLink to="/cart">장바구니</UtilityLink>
+          <UtilityLink to="/help">고객센터</UtilityLink>
+        </ul>
+      </nav>
     </div>
   );
 }

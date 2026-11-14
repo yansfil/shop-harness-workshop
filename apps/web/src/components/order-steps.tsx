@@ -1,6 +1,7 @@
 import { ORDER_STATUS_LABELS, type OrderStatus } from "@grabmarket/contracts";
 
-const STEPS: OrderStatus[] = ["paid", "preparing", "shipping", "delivered"];
+/** 배송이 나아가는 단계 순서. 주문 상세 단계 막대와 고객센터 배송 상태 안내가 쓴다. */
+export const STEPS: OrderStatus[] = ["paid", "preparing", "shipping", "delivered"];
 
 /** 취소된 주문은 단계가 이어지지 않으므로 막대 대신 한 줄로 알린다. */
 function CancelledNote() {
