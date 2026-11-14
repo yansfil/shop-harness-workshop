@@ -173,7 +173,7 @@ function insertProducts(db: Database, prng: Prng, clock: SeedClock): SeedProduct
   for (const base of SEED_PRODUCTS) {
     const basePopularity = 0.3 + prng.next() * 2;
     for (const [variantIndex, [option, price]] of base.variants.entries()) {
-      const result = insertProduct.run(categoryId.get(base.category) ?? null, base.key, `${base.name} ${option}`, option, base.description, price, `/images/products/${base.key}.webp`, createdAt);
+      const result = insertProduct.run(categoryId.get(base.category) ?? null, base.key, `${base.name} ${option}`, option, base.description, price, `/images/products/${base.key}-${variantIndex + 1}.webp`, createdAt);
       const id = Number(result.lastInsertRowid);
       const safetyStock = prng.pick([10, 20, 30]);
       insertInventory.run(id, safetyStock, createdAt);

@@ -1,4 +1,4 @@
-// 상품 40개(기본 상품) × 변형 = 120개. 이미지는 apps/web/public/images/products/<key>.webp 한 장을 변형이 함께 쓴다.
+// 상품 40개(기본 상품) × 변형 = 120개. 이미지는 변형마다 한 장씩 apps/web/public/images/products/<key>-<변형 순번(1부터)>.webp.
 import type { CategorySlug } from "../catalog/domain/product.ts";
 
 export interface SeedBaseProduct {
