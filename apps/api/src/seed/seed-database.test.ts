@@ -5,8 +5,10 @@ import { systemClock } from "@grabmarket/shared";
 import { beforeAll, describe, expect, it } from "vitest";
 import { REPO_ROOT } from "../config.ts";
 import { composeServices } from "../composition.ts";
+import { PRODUCT_STORIES } from "../catalog/infra/product-story-data.ts";
 import { OrderSimulator } from "./order-simulator.ts";
 import { Prng } from "./prng.ts";
+import { SEED_PRODUCTS } from "./product-catalog.ts";
 import { resetAndSeedDatabase } from "./seed-database.ts";
 
 const db = openMemoryDatabase();
@@ -35,6 +37,26 @@ describe("결정적 시드", () => {
     const images = (db.prepare("SELECT DISTINCT image_path FROM products").all() as unknown as { image_path: string }[]).map((row) => row.image_path);
     expect(images).toHaveLength(120);
     expect(images.filter((image) => !existsSync(path.join(REPO_ROOT, "apps", "web", "public", image)))).toEqual([]);
+  });
+
+  it("기본 상품 40개 모두 상세 글이 있고 옵션 한 줄의 키가 카탈로그 옵션과 같다", () => {
+    expect(PRODUCT_STORIES.map((story) => story.baseKey).sort()).toEqual(SEED_PRODUCTS.map((base) => base.key).sort());
+    for (const base of SEED_PRODUCTS) {
+      const story = PRODUCT_STORIES.find((candidate) => candidate.baseKey === base.key);
+      expect(Object.keys(story?.variantNotes ?? {}).sort(), base.key).toEqual(base.variants.map(([option]) => option).sort());
+      expect(story?.points, base.key).toHaveLength(3);
+    }
+  });
+
+  it("상품 120개 모두 상세를 만들 수 있고 한 줄 소개(description)는 상세 글의 tagline이다", () => {
+    const { catalog } = composeServices({ db, clock: systemClock });
+    const rows = db.prepare("SELECT id, base_key, description FROM products ORDER BY id").all() as unknown as { id: number; base_key: string; description: string }[];
+    expect(rows).toHaveLength(120);
+    for (const row of rows) {
+      const detail = catalog.getProduct(row.id);
+      expect(detail.story.tagline, row.base_key).toBe(row.description);
+      expect(detail.variants.length, row.base_key).toBeGreaterThanOrEqual(2);
+    }
   });
 
   it("주문은 180일에 걸쳐 있고 같은 시각의 묶음이 있다", () => {

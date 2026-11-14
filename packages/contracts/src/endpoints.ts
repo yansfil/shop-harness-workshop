@@ -17,6 +17,7 @@ import {
   OrderResponseSchema,
 } from "./orders.ts";
 import { ROUTES } from "./routes.ts";
+import { ShippingPolicyResponseSchema } from "./shipping.ts";
 
 /** public: 누구나, user: 로그인한 누구나, customer: 고객만, admin: 관리자만 */
 export type Access = "public" | "user" | "customer" | "admin";
@@ -48,6 +49,7 @@ export const ENDPOINTS = {
   listEvents: { method: "GET", path: ROUTES.events, access: "public", response: EventListResponseSchema },
   getEvent: { method: "GET", path: ROUTES.event, access: "public", params: EventParamsSchema, response: EventDetailResponseSchema },
 
+  getShippingPolicy: { method: "GET", path: ROUTES.shippingPolicy, access: "public", response: ShippingPolicyResponseSchema },
   quoteOrder: { method: "POST", path: ROUTES.orderQuote, access: "public", body: OrderQuoteRequestSchema, response: OrderQuoteResponseSchema },
   createOrder: { method: "POST", path: ROUTES.orders, access: "customer", body: CreateOrderRequestSchema, response: OrderResponseSchema },
   listMyOrders: { method: "GET", path: ROUTES.orders, access: "customer", response: MyOrderListResponseSchema },

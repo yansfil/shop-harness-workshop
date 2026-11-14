@@ -18,7 +18,7 @@ function createCatalogApp() {
     for (const [index, [option, price]] of base.variants.entries()) {
       const result = db
         .prepare("INSERT INTO products (category_id, base_key, name, option_label, description, price, image_path, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
-        .run(categoryId, base.key, `${base.name} ${option}`, option, base.description, price, `/images/products/${base.key}-${index + 1}.webp`, NOW);
+        .run(categoryId, base.key, `${base.name} ${option}`, option, base.name, price, `/images/products/${base.key}-${index + 1}.webp`, NOW);
       db.prepare("INSERT INTO inventory (product_id, quantity, safety_stock, updated_at) VALUES (?, ?, ?, ?)").run(Number(result.lastInsertRowid), 20, 5, NOW);
     }
   }
