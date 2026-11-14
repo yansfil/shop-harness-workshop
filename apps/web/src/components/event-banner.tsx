@@ -27,7 +27,7 @@ export function EventBanner({ events }: { events: EventSummary[] }) {
         <span className="absolute inset-x-4 bottom-4 flex flex-col gap-0.5 pr-20 text-on-dark md:inset-x-auto md:top-0 md:bottom-0 md:left-24 md:max-w-130 md:justify-center md:gap-2 md:pr-0 md:text-ink">
           <span className="text-xl leading-8 font-extrabold tracking-tight md:text-2xl md:leading-10.5">{current.title}</span>
           <span className="text-xs-plus leading-4.5 font-medium md:text-lg md:leading-7 md:text-ink-2">{current.summary}</span>
-          <span className="mt-2 text-xs leading-4 font-semibold md:mt-6 md:text-sm md:leading-5 md:text-ink-2">{current.period}</span>
+          <span className="mt-2 text-xs leading-4 font-semibold md:mt-6 md:text-sm md:leading-5 md:text-ink">{current.period}</span>
         </span>
       </Link>
       {many && (

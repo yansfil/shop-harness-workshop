@@ -137,7 +137,7 @@ export function EventPage() {
               </Link>
               <h1 className="text-xl leading-8 font-extrabold tracking-tight md:text-2xl md:leading-10.5">{event.title}</h1>
               <p className="text-xs-plus leading-4.5 font-medium md:text-lg md:leading-7 md:text-ink-2">{event.summary}</p>
-              <p className="mt-2 text-xs leading-4 font-semibold md:mt-6 md:text-sm md:leading-5 md:text-ink-2">{event.period}</p>
+              <p className="mt-2 text-xs leading-4 font-semibold md:mt-6 md:text-sm md:leading-5 md:text-ink">{event.period}</p>
             </div>
           </section>
           <section aria-labelledby="event-products" className="px-4 pt-6 pb-8 md:px-8 md:pt-12">
