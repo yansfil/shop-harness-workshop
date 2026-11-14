@@ -1,23 +1,22 @@
 import type { ProductDetail, ShippingPolicyResponse } from "@grabmarket/contracts";
-import { type KeyboardEvent, Suspense, useRef, useState } from "react";
-import { Await } from "react-router";
+import { type KeyboardEvent, useRef, useState } from "react";
 import { krw } from "../lib/format.ts";
-import { Bone } from "./states.tsx";
+import { InfoTable } from "./info-table.tsx";
+import { returnPolicyRows } from "./return-policy.tsx";
+import { ShippingFee } from "./shipping-fee.tsx";
 
 const TABS = [
   { key: "story", label: "상품설명" },
   { key: "info", label: "상품정보" },
-  { key: "delivery", label: "배송과 교환 안내" },
+  { key: "delivery", label: "배송 안내" },
+  { key: "returns", label: "교환·반품 안내" },
 ] as const;
 type TabKey = (typeof TABS)[number]["key"];
 
-/** 교환·반품 안내는 모든 상품에 같은 글이다. */
-const RETURN_NOTICE = "받은 날부터 7일 안에 고객센터로 알려 주세요. 신선식품은 단순 변심으로 교환·반품할 수 없습니다.";
-
-/** 상품 상세 아래의 탭 3개: 상품설명, 상품정보, 배송과 교환 안내. 후기 탭은 없다. */
+/** 상품 상세 아래의 탭 4개: 상품설명, 상품정보, 배송 안내, 교환·반품 안내. 후기 탭은 없다. */
 export function ProductTabs({ product, shipping }: { product: ProductDetail; shipping: Promise<ShippingPolicyResponse> }) {
   const [active, setActive] = useState<TabKey>("story");
-  const tabRefs = useRef<Record<TabKey, HTMLButtonElement | null>>({ story: null, info: null, delivery: null });
+  const tabRefs = useRef<Record<TabKey, HTMLButtonElement | null>>({ story: null, info: null, delivery: null, returns: null });
 
   function move(event: KeyboardEvent, index: number) {
     const step = event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0;
@@ -31,7 +30,7 @@ export function ProductTabs({ product, shipping }: { product: ProductDetail; shi
 
   return (
     <section aria-label="상품 안내" className="mt-8 max-md:mt-2 max-md:border-t-8 max-md:border-canvas">
-      <div role="tablist" aria-label="상품 안내" className="grid grid-cols-3 border-b border-line bg-ground md:sticky md:top-0 md:z-20 md:rounded-t-md md:border">
+      <div role="tablist" aria-label="상품 안내" className="grid grid-cols-4 border-b border-line bg-ground md:sticky md:top-0 md:z-20 md:rounded-t-md md:border">
         {TABS.map((tab, index) => {
           const selected = tab.key === active;
           return (
@@ -68,6 +67,7 @@ export function ProductTabs({ product, shipping }: { product: ProductDetail; shi
         {active === "story" && <StoryPanel product={product} />}
         {active === "info" && <InfoPanel product={product} />}
         {active === "delivery" && <DeliveryPanel shipping={shipping} />}
+        {active === "returns" && <ReturnsPanel />}
       </div>
     </section>
   );
@@ -118,26 +118,11 @@ function StoryPanel({ product }: { product: ProductDetail }) {
   );
 }
 
-const tableHead = "w-28 bg-canvas px-4 py-3.5 text-start align-top text-sm font-semibold text-ink-2 md:w-40";
-const tableCell = "px-4 py-3.5 text-sm leading-6 text-ink";
-
 function InfoPanel({ product }: { product: ProductDetail }) {
-  const rows = [{ label: "상품명", value: product.name }, ...product.story.info];
   return (
     <div className="mx-auto max-w-180">
       <h2 className="mb-3 text-lg font-extrabold text-ink">상품정보</h2>
-      <table className="w-full border-t-2 border-ink">
-        <tbody>
-          {rows.map((row) => (
-            <tr key={row.label} className="border-b border-line">
-              <th scope="row" className={tableHead}>
-                {row.label}
-              </th>
-              <td className={tableCell}>{row.value}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <InfoTable rows={[{ label: "상품명", value: product.name }, ...product.story.info]} />
     </div>
   );
 }
@@ -145,29 +130,17 @@ function InfoPanel({ product }: { product: ProductDetail }) {
 function DeliveryPanel({ shipping }: { shipping: Promise<ShippingPolicyResponse> }) {
   return (
     <div className="mx-auto max-w-180">
-      <h2 className="mb-3 text-lg font-extrabold text-ink">배송과 교환 안내</h2>
-      <table className="w-full border-t-2 border-ink">
-        <tbody>
-          <tr className="border-b border-line">
-            <th scope="row" className={tableHead}>
-              배송비
-            </th>
-            <td className={tableCell}>
-              <Suspense fallback={<Bone className="h-5 w-48" />}>
-                <Await resolve={shipping} errorElement={<span className="text-ink-3">배송비 안내를 불러오지 못했어요</span>}>
-                  {(policy: ShippingPolicyResponse) => `${krw(policy.freeThreshold)} 이상 주문하면 무료, 그 밖에는 ${krw(policy.fee)}`}
-                </Await>
-              </Suspense>
-            </td>
-          </tr>
-          <tr className="border-b border-line">
-            <th scope="row" className={tableHead}>
-              교환·반품
-            </th>
-            <td className={tableCell}>{RETURN_NOTICE}</td>
-          </tr>
-        </tbody>
-      </table>
+      <h2 className="mb-3 text-lg font-extrabold text-ink">배송 안내</h2>
+      <InfoTable rows={[{ label: "배송비", value: <ShippingFee shipping={shipping} /> }]} />
+    </div>
+  );
+}
+
+function ReturnsPanel() {
+  return (
+    <div className="mx-auto max-w-180">
+      <h2 className="mb-3 text-lg font-extrabold text-ink">교환·반품 안내</h2>
+      <InfoTable rows={returnPolicyRows("product")} />
     </div>
   );
 }

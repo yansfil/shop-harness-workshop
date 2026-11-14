@@ -1,6 +1,7 @@
 import { ORDER_STATUS_LABELS, type OrderStatus } from "@grabmarket/contracts";
 
-const STEPS: OrderStatus[] = ["paid", "preparing", "shipping", "delivered"];
+/** 배송이 나아가는 단계 순서. 주문 상세 단계 막대와 고객센터 배송 상태 안내가 쓴다. */
+export const STEPS: OrderStatus[] = ["paid", "preparing", "shipping", "delivered"];
 
 /** 결제완료 → 배송준비 → 배송중 → 배송완료 중 지금 단계를 보인다. 지난 단계는 진하게, 지금 단계는 보조색 막대, 앞으로는 옅게. */
 export function OrderSteps({ status }: { status: OrderStatus }) {
