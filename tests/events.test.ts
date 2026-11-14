@@ -14,7 +14,7 @@ function createCatalogApp() {
     db.prepare("INSERT INTO categories (slug, name, sort_order) VALUES (?, ?, ?)").run(category.slug, category.name, index + 1);
   }
   for (const base of SEED_PRODUCTS) {
-    const categoryId = Number((db.prepare("SELECT id FROM categories WHERE slug = ?").get(base.category) as { id: number }).id);
+    const categoryId = (db.prepare("SELECT id FROM categories WHERE slug = ?").get(base.category) as { id: number }).id;
     for (const [index, [option, price]] of base.variants.entries()) {
       const result = db
         .prepare("INSERT INTO products (category_id, base_key, name, option_label, description, price, image_path, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
