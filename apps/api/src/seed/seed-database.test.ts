@@ -26,14 +26,14 @@ describe("결정적 시드", () => {
     expect(second.rowCounts).toMatchObject({ users: 203, categories: 4, products: 120, inventory: 120, orders: 5000 });
   }, 60_000);
 
-  it("품절·남은 수량 적음·안전재고 미만 상품이 섞여 있고 상품 이미지 40장이 레포에 있다", () => {
+  it("품절·남은 수량 적음·안전재고 미만 상품이 섞여 있고 변형마다 다른 상품 이미지 120장이 레포에 있다", () => {
     const stock = db.prepare("SELECT SUM(quantity = 0) AS soldOut, SUM(quantity BETWEEN 1 AND 5) AS low, SUM(quantity > 5 AND quantity < safety_stock) AS belowSafety FROM inventory").get();
     expect(stock?.soldOut).toBeGreaterThan(0);
     expect(stock?.low).toBeGreaterThan(0);
     expect(stock?.belowSafety).toBeGreaterThan(0);
 
     const images = (db.prepare("SELECT DISTINCT image_path FROM products").all() as unknown as { image_path: string }[]).map((row) => row.image_path);
-    expect(images).toHaveLength(40);
+    expect(images).toHaveLength(120);
     expect(images.filter((image) => !existsSync(path.join(REPO_ROOT, "apps", "web", "public", image)))).toEqual([]);
   });
 

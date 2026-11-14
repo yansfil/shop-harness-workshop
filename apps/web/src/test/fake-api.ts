@@ -1,4 +1,4 @@
-import type { Category, ProductSearchResponse, ProductSummary } from "@grabmarket/contracts";
+import type { Category, EventDetailResponse, EventSummary, ProductSearchResponse, ProductSummary } from "@grabmarket/contracts";
 import { afterEach, beforeEach, vi } from "vitest";
 
 /**
@@ -37,6 +37,21 @@ export const PRODUCTS: ProductSummary[] = [
   product(6, "무선 블루투스 헤드폰 기본형", "electronics", 59_000, 12),
 ];
 
+function eventSummary(slug: string, title: string, summary: string, period: string, productCount: number): EventSummary {
+  return { slug, title, summary, period, bannerUrl: `/images/events/banner-${slug}.webp`, productCount };
+}
+
+export const EVENT_DETAILS: EventDetailResponse[] = [
+  {
+    event: eventSummary("winter-ready", "겨울 채비, 따뜻하게", "찬 바람 불기 전에 입고 두를 것부터 챙겨요.", "11월 14일 ~ 11월 30일", 2),
+    products: [PRODUCTS[3], PRODUCTS[4]].filter((item) => item !== undefined),
+  },
+  {
+    event: eventSummary("tangerine-season", "제철 감귤 모음", "상자째 받는 감귤부터 주스·젤리까지 모았어요.", "11월 10일 ~ 12월 7일", 3),
+    products: [PRODUCTS[0], PRODUCTS[1], PRODUCTS[2]].filter((item) => item !== undefined),
+  },
+];
+
 export function search(query: URLSearchParams): ProductSearchResponse {
   const q = query.get("q")?.toLowerCase();
   const minPrice = query.has("minPrice") ? Number(query.get("minPrice")) : undefined;
@@ -70,6 +85,8 @@ function defaults(): Record<string, Handler> {
   return {
     "GET /api/auth/me": () => error(401, "UNAUTHENTICATED", "로그인이 필요해요."),
     "GET /api/categories": () => ({ json: { categories: CATEGORIES } }),
+    "GET /api/events": () => ({ json: { events: EVENT_DETAILS.map((detail) => detail.event) } }),
+    ...Object.fromEntries(EVENT_DETAILS.map((detail): [string, Handler] => [`GET /api/events/${detail.event.slug}`, () => ({ json: detail })])),
     "GET /api/products": ({ url }) => ({ json: search(url.searchParams) }),
     "GET /api/products/suggest": ({ url }) => {
       const q = (url.searchParams.get("q") ?? "").toLowerCase();
