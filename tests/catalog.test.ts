@@ -46,7 +46,7 @@ describe("상품 검색", () => {
     expect(ProductSuggestResponseSchema.parse((await request(app).get(ROUTES.productSuggest).query({ q: "식" }).expect(200)).body).category).toEqual({ slug: "food", name: "식품" });
 
     const detail = ProductDetailResponseSchema.parse((await request(app).get(buildPath(ROUTES.product, { productId: PRODUCT.tangerine })).expect(200)).body);
-    expect(detail.product.variants).toEqual([{ id: PRODUCT.tangerine, optionLabel: "3kg", price: 17_900, stockStatus: "in_stock" }]);
+    expect(detail.product.variants).toEqual([{ id: PRODUCT.tangerine, optionLabel: "3kg", price: 17_900, stockStatus: "in_stock", imageUrl: "/images/products/jeju-tangerine.webp", note: "서너 식구가 며칠 나눠 먹는 양" }]);
     await request(app).get(buildPath(ROUTES.product, { productId: 999 })).expect(404);
     expect(CategoryListResponseSchema.parse((await request(app).get(ROUTES.categories).expect(200)).body).categories.map((category) => category.productCount)).toEqual([2, 0, 1, 1]);
   });
