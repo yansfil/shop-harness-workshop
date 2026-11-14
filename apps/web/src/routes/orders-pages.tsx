@@ -56,10 +56,10 @@ export function MyOrdersPage() {
             ) : (
               <OrderList orders={orders} />
             )}
-            <MobileFooter />
           </>
         )}
       </Loaded>
+      <MobileFooter />
     </Page>
   );
 }

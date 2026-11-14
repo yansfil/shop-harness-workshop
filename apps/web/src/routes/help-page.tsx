@@ -1,8 +1,9 @@
-import { type CategorySlug, OrderStatusSchema } from "@grabmarket/contracts";
+import type { CategorySlug } from "@grabmarket/contracts";
 import { Fragment } from "react";
 import { useLoaderData } from "react-router";
 import { callApi } from "../api/client.ts";
 import { LinkButton } from "../components/button.tsx";
+import { DELIVERY_STEPS } from "../components/order-steps.tsx";
 import { InfoTable } from "../components/info-table.tsx";
 import { Page } from "../components/page.tsx";
 import { returnPolicyRows } from "../components/return-policy.tsx";
@@ -48,7 +49,7 @@ export function HelpPage() {
               value: (
                 <>
                   <ol aria-label="배송 상태 순서" className="flex flex-wrap items-center gap-1.5">
-                    {OrderStatusSchema.options.map((status, index) => (
+                    {DELIVERY_STEPS.map((status, index) => (
                       <Fragment key={status}>
                         {index > 0 && (
                           <li aria-hidden="true" className="text-xs-plus text-ink-3">
