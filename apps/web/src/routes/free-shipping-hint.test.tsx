@@ -19,6 +19,7 @@ function setUp(subtotal: number, remaining: number) {
         stockQuantity: 40,
         stockStatus: "in_stock",
         description: "감귤",
+        story: { eyebrow: "제철 과일", headline: "제주 감귤", intro: "감귤입니다.", points: [], care: { title: "보관", body: "서늘한 곳" }, info: [] },
         variants: [],
       },
     },
