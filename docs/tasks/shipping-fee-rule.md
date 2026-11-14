@@ -26,12 +26,16 @@ export function calculateShippingFee(subtotal: Money): Money { ... }
 | `packages/contracts/src/orders.ts` | 견적·주문 응답의 `shippingFee` 필드와 "배송비 규칙은 서버 한 곳" 주석 |
 | `packages/db/migrations/0001_init.sql`의 `orders.shipping_fee` | 주문 시점의 배송비를 주문에 저장한다. 이미 만든 주문은 규칙이 바뀌어도 저장된 값이 그대로다 |
 | `apps/web/src/lib/use-quote.ts`, `components/summary-box.tsx` | 화면은 견적 응답의 값을 그대로 보인다. 장바구니·주문서·상품 상세가 같은 조각을 쓴다 |
+| `apps/api/src/orders/application/shipping-policy.ts`, `orders/web/shipping-policy-controller.ts` | `GET /api/shipping-policy`가 배송비와 무료 기준 두 상수를 그대로 내린다 |
+| `packages/contracts/src/shipping.ts` | 배송 규칙 응답(`fee`, `freeThreshold`)의 계약 |
+| `apps/web/src/components/product-tabs.tsx` | 상품 상세 "배송과 교환 안내" 탭이 `/api/shipping-policy` 값으로 배송비 문구를 만든다 |
 | `apps/web/src/routes/orders-pages.tsx`, `admin-orders-pages.tsx` | 주문 상세에서 저장된 배송비를 보인다 |
 | `apps/api/src/seed/seed-database.ts`, `order-simulator.ts` | 시드 주문과 시뮬레이터 주문도 같은 주문 서비스를 거치므로 규칙이 바뀌면 `npm run db:reset`으로 만든 주문 금액이 달라진다 |
 
 ## 지금 규칙을 고정한 테스트
 
 - `tests/orders.test.ts`: 합계 17,900 × 2 + 14,900원 주문의 `shippingFee`가 0, 합계 10,000원 주문의 견적·주문이 `shippingFee: 3_000, total: 13_000`.
+- `tests/product-detail.test.ts`: `/api/shipping-policy` 값이 견적이 실제로 적용하는 배송비·무료 기준과 같은지 맞춰 본다. 값 자체는 고정하지 않는다.
 - 규칙을 바꾸면 이 기대값이 정당하게 달라질 수 있다. 그래도 기존 `expect` 값을 몰래 맞추지 않고, PRD에 바뀐 규칙과 근거를 적은 뒤 그 PRD의 완료 조건에서 새 기대값을 가져온다(`docs/rules/07-verify-and-fixed-expectations.md`).
 
 ## 바꿀 거리 예시
