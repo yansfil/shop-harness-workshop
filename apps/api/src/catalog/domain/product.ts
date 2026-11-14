@@ -26,6 +26,7 @@ export interface ProductVariant {
   id: number;
   optionLabel: string | null;
   price: Money;
+  imagePath: string;
   stockQuantity: number;
 }
 

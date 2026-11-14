@@ -4,6 +4,7 @@ import { DEMO_ACCOUNTS } from "@grabmarket/contracts";
 import { type Database, dropAllTables, migrate } from "@grabmarket/db";
 import { FixedClock } from "@grabmarket/shared";
 import { hashPassword } from "../auth/infra/scrypt-password-hasher.ts";
+import { InCodeProductStoryRepository } from "../catalog/infra/in-code-product-story-repository.ts";
 import { composeServices } from "../composition.ts";
 import { nextStatusOf } from "../orders/domain/order-status.ts";
 import type { SessionUser } from "../shared/domain/session-user.ts";
@@ -169,11 +170,14 @@ function insertProducts(db: Database, prng: Prng, clock: SeedClock): SeedProduct
     "INSERT INTO products (category_id, base_key, name, option_label, description, price, image_path, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
   );
   const insertInventory = db.prepare("INSERT INTO inventory (product_id, quantity, safety_stock, updated_at) VALUES (?, 0, ?, ?)");
+  const stories = new InCodeProductStoryRepository();
   const products: SeedProduct[] = [];
   for (const base of SEED_PRODUCTS) {
+    const story = stories.findByBaseKey(base.key);
+    if (story === undefined) throw new Error(`상품 상세 글이 없습니다: ${base.key}`);
     const basePopularity = 0.3 + prng.next() * 2;
     for (const [variantIndex, [option, price]] of base.variants.entries()) {
-      const result = insertProduct.run(categoryId.get(base.category) ?? null, base.key, `${base.name} ${option}`, option, base.description, price, `/images/products/${base.key}-${variantIndex + 1}.webp`, createdAt);
+      const result = insertProduct.run(categoryId.get(base.category) ?? null, base.key, `${base.name} ${option}`, option, story.tagline, price, `/images/products/${base.key}-${variantIndex + 1}.webp`, createdAt);
       const id = Number(result.lastInsertRowid);
       const safetyStock = prng.pick([10, 20, 30]);
       insertInventory.run(id, safetyStock, createdAt);
