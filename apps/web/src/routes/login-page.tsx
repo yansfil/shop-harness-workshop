@@ -2,6 +2,7 @@ import { DEMO_ACCOUNTS } from "@grabmarket/contracts";
 import { type ActionFunctionArgs, Form, redirect, useActionData, useNavigation, useSearchParams } from "react-router";
 import { callApi, isApiError } from "../api/client.ts";
 import { Button } from "../components/button.tsx";
+import { EDUCATION_NOTICE } from "../lib/education-notice.ts";
 import { safeNext } from "../lib/login-path.ts";
 
 interface LoginFailure {
@@ -110,7 +111,7 @@ export function LoginPage() {
           </ul>
         </section>
       </div>
-      <p className="mt-6 text-center text-xs-plus text-ink-2">그랩마켓은 가상의 교육용 쇼핑몰이에요. 실제 결제와 배송은 이뤄지지 않아요.</p>
+      <p className="mt-6 text-center text-xs-plus text-ink-2">{EDUCATION_NOTICE}</p>
     </div>
   );
 }

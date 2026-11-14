@@ -7,6 +7,7 @@ import { CartPage, cartLoader } from "./routes/cart-page.tsx";
 import { CategoryPage, categoryLoader } from "./routes/category-page.tsx";
 import { CheckoutPage, checkoutLoader } from "./routes/checkout-page.tsx";
 import { EventPage, EventsPage, eventLoader, eventsLoader } from "./routes/events-pages.tsx";
+import { HelpPage, helpLoader } from "./routes/help-page.tsx";
 import { HomePage, homeLoader } from "./routes/home-page.tsx";
 import { LoginPage, loginAction } from "./routes/login-page.tsx";
 import { NotFoundPage } from "./routes/not-found-page.tsx";
@@ -77,6 +78,7 @@ export const routes: RouteObject[] = [
             ],
           },
           { path: "orders/:orderId/complete", element: <OrderCompletePage />, loader: myOrderLoader },
+          { path: "help", element: <HelpPage />, loader: helpLoader },
           { path: "login", element: <LoginPage />, action: loginAction },
           { path: "*", element: <NotFoundPage /> },
         ],

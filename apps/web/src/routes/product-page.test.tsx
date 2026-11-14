@@ -76,11 +76,11 @@ describe("상품 상세 위쪽", () => {
 });
 
 describe("상품 상세 탭", () => {
-  it("탭은 상품설명, 상품정보, 배송과 교환 안내 세 개이고 후기 탭은 없다", async () => {
+  it("탭은 상품설명, 상품정보, 배송 안내, 교환·반품 안내 네 개이고 후기 탭은 없다", async () => {
     open(1);
     const tabs = within(await screen.findByRole("tablist", { name: "상품 안내" })).getAllByRole("tab");
 
-    expect(tabs.map((tab) => tab.textContent)).toEqual(["상품설명", "상품정보", "배송과 교환 안내"]);
+    expect(tabs.map((tab) => tab.textContent)).toEqual(["상품설명", "상품정보", "배송 안내", "교환·반품 안내"]);
     expect(tabs[0]).toHaveAttribute("aria-selected", "true");
     expect(screen.queryByText(/후기|별점/)).not.toBeInTheDocument();
   });
@@ -109,11 +109,26 @@ describe("상품 상세 탭", () => {
     ]);
   });
 
-  it("배송비 안내의 숫자는 서버가 준 규칙 값에서 온다", async () => {
+  it("배송 안내의 배송비 숫자는 서버가 준 규칙 값에서 온다", async () => {
     open(1);
-    await userEvent.click(await screen.findByRole("tab", { name: "배송과 교환 안내" }));
+    await userEvent.click(await screen.findByRole("tab", { name: "배송 안내" }));
 
     expect(await screen.findByText("50,000원 이상 주문하면 무료, 그 밖에는 4,000원")).toBeInTheDocument();
-    expect(screen.getByRole("row", { name: /교환·반품/ })).toBeInTheDocument();
+  });
+
+  it("교환·반품 안내 글의 내 주문을 누르면 내 주문 화면으로 간다", async () => {
+    const router = open(1);
+    await userEvent.click(await screen.findByRole("tab", { name: "교환·반품 안내" }));
+    const panel = screen.getByRole("tabpanel");
+
+    expect(within(panel).getAllByRole("row").map((row) => row.textContent)).toEqual([
+      "신청 기간배송완료 뒤 7일 안에 내 주문 상세에서 신청해 주세요",
+      "주문 취소결제완료·배송준비 주문은 내 주문 상세에서 취소할 수 있어요",
+      "안 되는 경우배송완료 전이거나 취소된 주문은 교환·반품을 신청할 수 없어요",
+    ]);
+    await userEvent.click(within(panel).getByRole("link", { name: "내 주문" }));
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe("/orders");
+    });
   });
 });
