@@ -48,16 +48,26 @@ export function toSuggestDto(result: SuggestResult): ProductSuggestResponse {
   };
 }
 
-export function toProductDetailDto({ product, variants }: ProductDetail): ProductDetailResponse {
+export function toProductDetailDto({ product, variants, story }: ProductDetail): ProductDetailResponse {
   return {
     product: {
       ...toProductSummaryDto(product),
       description: product.description,
+      story: {
+        eyebrow: story.eyebrow,
+        headline: story.headline,
+        intro: story.intro,
+        points: story.points.map(({ title, body }) => ({ title, body })),
+        care: { title: story.care.title, body: story.care.body },
+        info: story.info.map(([label, value]) => ({ label, value })),
+      },
       variants: variants.map((variant) => ({
         id: variant.id,
         optionLabel: variant.optionLabel,
         price: variant.price,
         stockStatus: toStockStatus(variant.stockQuantity),
+        imageUrl: variant.imagePath,
+        note: variant.note,
       })),
     },
   };
