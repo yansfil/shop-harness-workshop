@@ -1,4 +1,4 @@
-import { type ProductDetail, ProductParamsSchema } from "@grabmarket/contracts";
+import { type ProductDetail, ProductParamsSchema, type ShippingPolicyResponse } from "@grabmarket/contracts";
 import { useEffect, useState } from "react";
 import { Link, type LoaderFunctionArgs, useLoaderData, useNavigate } from "react-router";
 import { streamed } from "../lib/streamed.ts";
@@ -6,6 +6,8 @@ import { callApi } from "../api/client.ts";
 import { Button, LinkButton } from "../components/button.tsx";
 import { Loaded } from "../components/loaded.tsx";
 import { ProductBadge, ProductGrid, ProductGridSkeleton } from "../components/product-card.tsx";
+import { OptionChips, OptionPhotoRow } from "../components/product-options.tsx";
+import { ProductTabs } from "../components/product-tabs.tsx";
 import { QuantityStepper } from "../components/quantity-stepper.tsx";
 import { Bone, EmptyState } from "../components/states.tsx";
 import { groupDigits, krw } from "../lib/format.ts";
@@ -20,11 +22,12 @@ export function productLoader({ params }: LoaderFunctionArgs) {
   if (!parsed.success) throw new NotFoundError("찾을 수 없는 상품입니다");
   const product = callApi("getProduct", { params: { productId: parsed.data.productId } });
   const related = product.then((data) => callApi("searchProducts", { query: { category: data.product.category.slug } }));
-  return { product: streamed(product), related: streamed(related) };
+  const shipping = callApi("getShippingPolicy");
+  return { product: streamed(product), related: streamed(related), shipping: streamed(shipping) };
 }
 
 export function ProductPage() {
-  const { product, related } = useLoaderData<typeof productLoader>();
+  const { product, related, shipping } = useLoaderData<typeof productLoader>();
   return (
     <Loaded
       resolve={product}
@@ -40,7 +43,7 @@ export function ProductPage() {
     >
       {({ product: detail }) => (
         <>
-          <ProductDetailView product={detail} />
+          <ProductDetailView key={detail.id} product={detail} shipping={shipping} />
           <section className="px-4 pt-8 pb-24 max-md:hidden md:px-8 md:pb-10">
             <h2 className="text-lg leading-7 font-extrabold text-ink">{detail.category.name} 상품 더 보기</h2>
             <div className="mt-4">
@@ -73,7 +76,7 @@ function ProductSkeleton() {
   );
 }
 
-function ProductDetailView({ product }: { product: ProductDetail }) {
+function ProductDetailView({ product, shipping }: { product: ProductDetail; shipping: Promise<ShippingPolicyResponse> }) {
   const navigate = useNavigate();
   const lines = useCartLines();
   const soldOut = product.stockStatus === "sold_out";
@@ -110,11 +113,19 @@ function ProductDetailView({ product }: { product: ProductDetail }) {
         </ol>
       </nav>
       <div className="md:grid md:grid-cols-[minmax(0,520px)_1fr] md:gap-8 md:rounded-md md:border md:border-line md:bg-ground md:p-6">
-        <div className="aspect-square bg-canvas md:rounded-sm">
-          <img src={product.imageUrl} alt={product.name} className={`size-full object-cover md:rounded-sm ${soldOut ? "opacity-45" : ""}`} />
+        <div>
+          <div className="aspect-square bg-canvas md:rounded-sm">
+            <img src={product.imageUrl} alt={product.name} className={`size-full object-cover md:rounded-sm ${soldOut ? "opacity-45" : ""}`} />
+          </div>
+          {product.variants.length > 1 && (
+            <div className="md:mt-3">
+              <OptionPhotoRow variants={product.variants} currentId={product.id} />
+            </div>
+          )}
         </div>
         <div className="p-4 md:p-0">
           <h1 className="text-base leading-6 font-medium text-ink-2 md:text-3xl md:leading-9 md:font-extrabold md:text-ink">{product.name}</h1>
+          <p className="mt-1 text-xs-plus leading-5 text-ink-3 md:mt-2 md:text-base md:leading-6 md:text-ink-2">{product.description}</p>
           <p className={`mt-2 flex items-baseline gap-1 md:mt-5 ${soldOut ? "text-ink-3" : "text-ink"}`}>
             <span className="text-3xl leading-none font-extrabold tracking-tight md:text-price-xl">{groupDigits(product.price)}</span>
             <span className="text-lg font-bold">원</span>
@@ -123,6 +134,12 @@ function ProductDetailView({ product }: { product: ProductDetail }) {
             <ProductBadge product={product} />
             {soldOut && <span className="text-xs-plus text-ink-2">지금은 담거나 구매할 수 없어요</span>}
           </div>
+          {product.variants.length > 1 && (
+            <div className="mt-5">
+              <h2 className="mb-2 text-sm text-ink-3">옵션 고르기</h2>
+              <OptionChips variants={product.variants} currentId={product.id} />
+            </div>
+          )}
           <dl className="mt-5 border-t border-line md:mt-6">
             {canAdd && (
               <div className="flex h-14 items-center justify-between border-b border-line">
@@ -164,6 +181,7 @@ function ProductDetailView({ product }: { product: ProductDetail }) {
           </div>
         </div>
       </div>
+      <ProductTabs product={product} shipping={shipping} />
       <AddedToast key={toastKey} show={toastKey > 0} />
     </div>
   );
