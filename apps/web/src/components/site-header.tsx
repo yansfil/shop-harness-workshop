@@ -14,7 +14,7 @@ export function Logo({ className = "" }: { className?: string }) {
 }
 
 /**
- * 고객 화면 머리: 로고·큰 검색창·내 주문·장바구니. 카테고리 줄은 데스크톱에서 항상, 모바일(375px)에서는 mobileCategories가 켜진
+ * 고객 화면 머리: 로고·큰 검색창·내 주문·장바구니. 카테고리 줄(맨 끝이 기획전)은 데스크톱에서 항상, 모바일(375px)에서는 mobileCategories가 켜진
  * 화면(홈·카테고리·검색 결과)에만 둔다.
  */
 export function SiteHeader({ mobileCategories }: { mobileCategories: boolean }) {
@@ -22,6 +22,7 @@ export function SiteHeader({ mobileCategories }: { mobileCategories: boolean }) 
   const location = useLocation();
   const [params] = useSearchParams();
   const cartCount = useCartLines().length;
+  const eventsActive = location.pathname === "/events" || location.pathname.startsWith("/events/");
   const initialQuery = location.pathname === "/search" ? (params.get("q") ?? "") : "";
   const activeCategory = location.pathname.startsWith("/category/")
     ? location.pathname.slice("/category/".length)
@@ -72,6 +73,12 @@ export function SiteHeader({ mobileCategories }: { mobileCategories: boolean }) 
               {category.name}
             </CategoryLink>
           ))}
+          <li aria-hidden="true" className="flex items-center">
+            <span className="h-4 w-px bg-line" />
+          </li>
+          <CategoryLink to="/events" active={eventsActive}>
+            기획전
+          </CategoryLink>
         </ul>
       </nav>
     </header>
