@@ -1,5 +1,5 @@
 import { DomainError, notFound } from "../../shared/domain/domain-error.ts";
-import type { Category, CategoryCount, CatalogRepository, Product, ProductVariant, SearchCriteria } from "../domain/product.ts";
+import type { Category, CategoryCount, CatalogRepository, Product, ProductVariant, SearchCriteria, VariantRef } from "../domain/product.ts";
 import { suggestCategory } from "../domain/suggest.ts";
 
 export interface SearchResult {
@@ -41,6 +41,16 @@ export class CatalogService {
     const product = this.#catalog.findById(id);
     if (product === undefined) throw notFound("상품");
     return { product, variants: this.#catalog.findVariants(product.baseKey) };
+  }
+
+  /** 기획전이 쓰는 조회: 모든 상품이 있어야 한다. 요청 순서대로 돌려준다. 없는 상품은 데이터가 어긋난 것이라 오류로 올린다. */
+  getProductsByVariant(refs: readonly VariantRef[]): Product[] {
+    const found = new Map(this.#catalog.findByVariants(refs).map((product) => [`${product.baseKey}\u0000${product.optionLabel ?? ""}`, product]));
+    return refs.map((ref) => {
+      const product = found.get(`${ref.baseKey}\u0000${ref.optionLabel}`);
+      if (product === undefined) throw new Error(`상품이 없습니다: ${ref.baseKey} ${ref.optionLabel}`);
+      return product;
+    });
   }
 
   /** 주문이 쓰는 조회: 모든 상품이 있어야 한다. 요청 순서대로 돌려준다. */
