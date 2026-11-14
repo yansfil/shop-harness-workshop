@@ -96,6 +96,51 @@ describe("홈 배너 자동 넘김", () => {
     expect(banner.querySelectorAll("a")).toHaveLength(1);
   });
 
+  it("미끄러지는 0.5초 안에 다음을 다시 눌러도 처음 칸이 그려져 있고(inert), 끝나면 1장만 남는다", async () => {
+    const user = userEvent.setup({ delay: null });
+    const { banner } = renderBanner();
+    await user.click(within(banner).getByRole("button", { name: "다음 기획전" }));
+    wait(150);
+    await user.click(within(banner).getByRole("button", { name: "다음 기획전" }));
+
+    const links = Array.from(banner.querySelectorAll("a"));
+    expect(links.map((link) => link.getAttribute("href"))).toEqual(["/events/event-1", "/events/event-2", "/events/event-3"]);
+    expect(links.map((link) => link.hasAttribute("inert"))).toEqual([true, true, false]);
+    expect(track(banner).style.transform).toBe("translateX(-200%)");
+
+    wait(499);
+    expect(banner.querySelectorAll("a")).toHaveLength(3);
+    wait(1);
+    expect(Array.from(banner.querySelectorAll("a")).map((link) => link.getAttribute("href"))).toEqual(["/events/event-3"]);
+  });
+
+  it("이전을 연타하거나 점으로 넘긴 뒤 다시 눌러도 지나가는 칸이 모두 그려져 있다", async () => {
+    const user = userEvent.setup({ delay: null });
+    const { banner } = renderBanner();
+    await user.click(within(banner).getByRole("button", { name: "이전 기획전" }));
+    wait(150);
+    await user.click(within(banner).getByRole("button", { name: "이전 기획전" }));
+    expect(Array.from(banner.querySelectorAll("a")).map((link) => link.getAttribute("href"))).toEqual(["/events/event-2", "/events/event-3", "/events/event-1"]);
+    expect(shownHref(banner)).toBe("/events/event-2");
+    wait(500);
+    expect(banner.querySelectorAll("a")).toHaveLength(1);
+
+    await user.click(within(banner).getByRole("button", { name: "셋 배너 보기" }));
+    wait(150);
+    await user.click(within(banner).getByRole("button", { name: "다음 기획전" }));
+    expect(Array.from(banner.querySelectorAll("a")).map((link) => link.getAttribute("href"))).toEqual(["/events/event-2", "/events/event-3", "/events/event-1"]);
+    expect(shownHref(banner)).toBe("/events/event-1");
+  });
+
+  it("자동으로 넘기는 중에 버튼을 눌러도 출발 칸이 지워지지 않는다", async () => {
+    const user = userEvent.setup({ delay: null });
+    const { banner } = renderBanner();
+    wait(5000);
+    wait(100);
+    await user.click(within(banner).getByRole("button", { name: "다음 기획전" }));
+    expect(Array.from(banner.querySelectorAll("a")).map((link) => link.getAttribute("href"))).toEqual(["/events/event-1", "/events/event-2", "/events/event-3"]);
+  });
+
   it("마지막 다음은 같은 방향으로 첫 배너로 이어진다(트랙이 되감기지 않는다)", () => {
     const { banner } = renderBanner();
     wait(5000);

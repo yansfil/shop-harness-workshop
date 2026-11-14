@@ -12,10 +12,25 @@ const AUTO_MS = 5000;
 const SLIDE_MS = 500;
 const REDUCED_MOTION = "(prefers-reduced-motion: reduce)";
 
-/** `pos`는 줄어들거나 끝없이 커질 수 있는 가로 칸 번호이고, `from`은 미끄러지기 시작한 칸이다. `epoch`는 넘김마다 올라가 5초를 새로 세게 한다. */
-type Nav = { pos: number; from: number; epoch: number };
+/**
+ * `pos`는 줄어들거나 끝없이 커질 수 있는 가로 칸 번호이고, `lo`~`hi`는 트랙이 멈출 때까지 화면에 걸칠 수 있어 그려 두는 칸이다.
+ * `epoch`는 넘김마다 올라가 5초를 새로 세게 한다.
+ */
+type Nav = { pos: number; lo: number; hi: number; epoch: number };
 
 const wrap = (value: number, size: number) => ((value % size) + size) % size;
+
+/** 새 칸으로 넘긴다. 미끄러지는 중에 다시 넘겨도 지나온 칸을 지우지 않고, 그려 둘 칸은 기획전 수를 넘기지 않는다(같은 기획전이 두 번 그려지지 않게). */
+function moveTo(nav: Nav, target: number, size: number): Nav {
+  let { lo, hi } = nav;
+  lo = Math.min(lo, target);
+  hi = Math.max(hi, target);
+  if (hi - lo + 1 > size) {
+    if (target > nav.pos) lo = hi - size + 1;
+    else hi = lo + size - 1;
+  }
+  return { pos: target, lo, hi, epoch: nav.epoch + 1 };
+}
 
 function subscribeReducedMotion(notify: () => void) {
   const query = window.matchMedia(REDUCED_MOTION);
@@ -49,7 +64,7 @@ function PauseIcon({ paused }: { paused: boolean }) {
  * 글자는 사진 위에 얹는다: 데스크톱은 왼쪽 빈 곳에 진한 글자, 모바일은 아래 어두운 그라데이션 위에 흰 글자.
  */
 export function EventBanner({ events }: { events: EventSummary[] }) {
-  const [nav, setNav] = useState<Nav>({ pos: 0, from: 0, epoch: 0 });
+  const [nav, setNav] = useState<Nav>({ pos: 0, lo: 0, hi: 0, epoch: 0 });
   const [userPaused, setUserPaused] = useState(false);
   const [hovered, setHovered] = useState(false);
   const [focused, setFocused] = useState(false);
@@ -62,16 +77,16 @@ export function EventBanner({ events }: { events: EventSummary[] }) {
   useEffect(() => {
     if (!playing) return;
     const timer = setTimeout(() => {
-      setNav((value) => ({ pos: value.pos + 1, from: value.pos, epoch: value.epoch + 1 }));
+      setNav((value) => moveTo(value, value.pos + 1, size));
     }, AUTO_MS);
     return () => {
       clearTimeout(timer);
     };
-  }, [playing, nav.epoch]);
+  }, [playing, nav.epoch, size]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      setNav((value) => (value.from === value.pos ? value : { ...value, from: value.pos }));
+      setNav((value) => (value.lo === value.pos && value.hi === value.pos ? value : { ...value, lo: value.pos, hi: value.pos }));
     }, SLIDE_MS);
     return () => {
       clearTimeout(timer);
@@ -81,9 +96,9 @@ export function EventBanner({ events }: { events: EventSummary[] }) {
   if (size === 0) return null;
   const index = wrap(nav.pos, size);
   const move = (next: (pos: number) => number) => {
-    setNav((value) => ({ pos: next(value.pos), from: value.pos, epoch: value.epoch + 1 }));
+    setNav((value) => moveTo(value, next(value.pos), size));
   };
-  const slots = Array.from({ length: Math.abs(nav.pos - nav.from) + 1 }, (_, offset) => Math.min(nav.pos, nav.from) + offset);
+  const slots = Array.from({ length: nav.hi - nav.lo + 1 }, (_, offset) => nav.lo + offset);
 
   return (
     <section
@@ -149,7 +164,7 @@ export function EventBanner({ events }: { events: EventSummary[] }) {
                 onClick={() => {
                   setUserPaused((value) => !value);
                 }}
-                className="relative mr-1 flex size-4 items-center justify-center rounded-pill text-ink before:absolute before:-inset-1 before:content-[''] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink md:mr-1.5 md:size-5"
+                className="relative mr-1 flex size-4 items-center justify-center rounded-pill text-ink before:absolute before:-inset-x-0.5 before:-inset-y-1 before:content-[''] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink md:mr-1.5 md:size-5"
               >
                 <PauseIcon paused={userPaused} />
               </button>
