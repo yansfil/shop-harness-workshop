@@ -26,7 +26,7 @@ API 서버(Express 5)와 웹(React+Vite)이 한 레포의 npm workspaces로 묶�
                                                infra(repository) ┘
 ```
 
-API 모듈은 `catalog`, `inventory`, `orders`, `auth`, `shared`이고, 모듈마다 네 계층을 둡니다.
+API 모듈은 `catalog`, `events`, `inventory`, `orders`, `auth`, `shared`이고, 모듈마다 네 계층을 둡니다.
 
 | 계층 | 하는 일 | import해도 되는 것 |
 | --- | --- | --- |
@@ -54,6 +54,13 @@ SQLite 파일은 `data/` 아래에 있고 git에 올리지 않습니다.
 
 키 목록과 기본값은 `apps/api/src/config.ts`의 `ENV_REGISTRY` 한 곳에 있고, `.env.example`이 같은 키를 보입니다.
 
+## 기획전
+
+기획전 4개는 DB가 아니라 `apps/api/src/events/infra/event-data.ts` 안의 코드 데이터입니다.
+상품은 기본 상품 key와 변형 이름으로 가리키고, 이름·가격·재고는 상품 저장소가 줍니다.
+기간은 화면에 보이는 글자이고 진행 중인지는 계산하지 않습니다.
+배너 사진은 `apps/web/public/images/events/banner-<slug>.webp`입니다.
+
 ## 시드와 교육용 계정
 
 `npm run db:reset`은 모든 테이블을 지우고 마이그레이션과 시드를 다시 적용합니다.
@@ -63,7 +70,7 @@ SQLite 파일은 `data/` 아래에 있고 git에 올리지 않습니다.
 | 데이터 | 규모 |
 | --- | --- |
 | 계정 | 관리자 1명, 로그인 고객 2명, 주문만 가진 고객 200명 |
-| 상품 | 120개(기본 상품 40개 × 변형), 이미지는 `apps/web/public/images/products/<key>.webp` 40장 |
+| 상품 | 120개(기본 상품 40개 × 변형), 이미지는 변형마다 한 장씩 `apps/web/public/images/products/<key>-<변형 순번>.webp` 120장 |
 | 재고 | 일부 품절, 5개 이하, 안전재고 미만 |
 | 주문 | 180일에 걸친 약 5,000건, 같은 시각에 들어온 묶음 포함 |
 

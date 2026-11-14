@@ -47,6 +47,11 @@ export interface CategoryCount {
   count: number;
 }
 
+export interface VariantRef {
+  baseKey: string;
+  optionLabel: string;
+}
+
 export interface SuggestMatches {
   /** 이름이 일치하는 상품 최대 limit개 */
   products: { id: number; name: string }[];
@@ -63,4 +68,6 @@ export interface CatalogRepository {
   findById(id: number): Product | undefined;
   findByIds(ids: number[]): Product[];
   findVariants(baseKey: string): ProductVariant[];
+  /** 기본 상품 key와 변형 이름으로 찾는다. 찾은 상품만 돌려주고 순서는 정하지 않는다 */
+  findByVariants(refs: readonly VariantRef[]): Product[];
 }

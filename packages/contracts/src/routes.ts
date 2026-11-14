@@ -11,6 +11,9 @@ export const ROUTES = {
   productSuggest: "/api/products/suggest",
   product: "/api/products/:productId",
 
+  events: "/api/events",
+  event: "/api/events/:slug",
+
   orderQuote: "/api/orders/quote",
   orders: "/api/orders",
   order: "/api/orders/:orderId",

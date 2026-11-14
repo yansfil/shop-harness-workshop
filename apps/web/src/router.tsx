@@ -6,6 +6,7 @@ import { AdminInventoryPage, inventoryLoader } from "./routes/admin-inventory-pa
 import { CartPage, cartLoader } from "./routes/cart-page.tsx";
 import { CategoryPage, categoryLoader } from "./routes/category-page.tsx";
 import { CheckoutPage, checkoutLoader } from "./routes/checkout-page.tsx";
+import { EventPage, EventsPage, eventLoader, eventsLoader } from "./routes/events-pages.tsx";
 import { HomePage, homeLoader } from "./routes/home-page.tsx";
 import { LoginPage, loginAction } from "./routes/login-page.tsx";
 import { NotFoundPage } from "./routes/not-found-page.tsx";
@@ -56,6 +57,8 @@ export const routes: RouteObject[] = [
           { index: true, element: <HomePage />, loader: homeLoader, handle: { mobileCategories: true } },
           { path: "category/:slug", element: <CategoryPage />, loader: categoryLoader, handle: { mobileCategories: true } },
           { path: "search", element: <SearchPage />, loader: searchLoader, handle: { mobileCategories: true } },
+          { path: "events", element: <EventsPage />, loader: eventsLoader },
+          { path: "events/:slug", element: <EventPage />, loader: eventLoader },
           { path: "products/:productId", element: <ProductPage />, loader: productLoader },
           { path: "cart", element: <CartPage />, loader: cartLoader },
           { path: "checkout", element: <CheckoutPage />, loader: checkoutLoader },
