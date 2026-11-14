@@ -96,17 +96,41 @@ export type ProductSuggestResponse = z.infer<typeof ProductSuggestResponseSchema
 
 export const ProductParamsSchema = z.object({ productId: z.coerce.number().int().positive() });
 
-/** GET /api/products/:productId (로그인 불필요). 없으면 404 NOT_FOUND */
+/** 상품설명 탭의 글. 같은 기본 상품이면 옵션이 달라도 같다. */
+export const ProductStorySchema = z.object({
+  /** 상품설명 맨 위 작은 글. 예: "제철 과일" */
+  eyebrow: z.string(),
+  /** 큰 제목. 줄바꿈(\n)으로 두 줄에 나뉜다. */
+  headline: z.string(),
+  intro: z.string(),
+  /** 포인트 3개 */
+  points: z.array(z.object({ title: z.string(), body: z.string() })),
+  /** 보관·사용·세탁 방법 한 덩이 */
+  care: z.object({ title: z.string(), body: z.string() }),
+  /** 상품정보 표의 줄들. 상품명 줄은 화면이 붙인다. */
+  info: z.array(z.object({ label: z.string(), value: z.string() })),
+});
+export type ProductStory = z.infer<typeof ProductStorySchema>;
+
+/**
+ * GET /api/products/:productId (로그인 불필요). 없으면 404 NOT_FOUND
+ * description은 한 줄 소개이고, story는 상품설명·상품정보 탭의 글이다.
+ */
 export const ProductDetailResponseSchema = z.object({
   product: ProductSummarySchema.extend({
     description: z.string(),
-    /** 같은 기본 상품의 변형들(자기 자신 포함), 가격 오름차순 */
+    story: ProductStorySchema,
+    /** 같은 기본 상품의 변형들(자기 자신 포함), 가격 오름차순. 화면은 옵션 버튼과 옵션 사진 줄을 이 목록으로 만든다. */
     variants: z.array(
       z.object({
         id: IdSchema,
         optionLabel: z.string().nullable(),
         price: MoneySchema,
         stockStatus: StockStatusSchema,
+        /** 이 옵션의 사진. 예: /images/products/jeju-tangerine-2.webp */
+        imageUrl: z.string(),
+        /** 옵션마다 한 줄 */
+        note: z.string(),
       }),
     ),
   }),
