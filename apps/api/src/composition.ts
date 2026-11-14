@@ -12,6 +12,7 @@ import { SqliteUserRepository } from "./auth/infra/sqlite-user-repository.ts";
 import { AuthController } from "./auth/web/auth-controller.ts";
 import { createSessionMiddleware } from "./auth/web/session-middleware.ts";
 import { CatalogService } from "./catalog/application/catalog-service.ts";
+import { InCodeProductStoryRepository } from "./catalog/infra/in-code-product-story-repository.ts";
 import { SqliteCatalogRepository } from "./catalog/infra/sqlite-catalog-repository.ts";
 import { CatalogController } from "./catalog/web/catalog-controller.ts";
 import { EventService } from "./events/application/event-service.ts";
@@ -26,6 +27,7 @@ import { SqliteOrderRepository } from "./orders/infra/sqlite-order-repository.ts
 import { AdminOrderController } from "./orders/web/admin-order-controller.ts";
 import { MyOrderController } from "./orders/web/my-order-controller.ts";
 import { OrderController } from "./orders/web/order-controller.ts";
+import { ShippingPolicyController } from "./orders/web/shipping-policy-controller.ts";
 import { SqliteUnitOfWork } from "./shared/infra/sqlite-unit-of-work.ts";
 import { HealthController } from "./shared/web/health-controller.ts";
 import { bootLegacy, LegacyRoutes } from "./legacy/legacyBootstrap.ts";
@@ -46,7 +48,7 @@ export function composeServices({ db, clock }: AppDependencies) {
     new CryptoSessionTokens(),
     clock,
   );
-  const catalog = new CatalogService(new SqliteCatalogRepository(db));
+  const catalog = new CatalogService(new SqliteCatalogRepository(db), new InCodeProductStoryRepository());
   const events = new EventService(new InCodeEventRepository(), catalog);
   const inventory = new InventoryService(new SqliteInventoryRepository(db), uow, clock);
   const orderRepository = new SqliteOrderRepository(db);
@@ -64,6 +66,7 @@ export function composeApp(dependencies: AppDependencies): Express {
     new AuthController(auth),
     new CatalogController(catalog),
     new EventController(events),
+    new ShippingPolicyController(),
     new OrderController(orders),
     new MyOrderController(orderRepository),
     new AdminOrderController(adminOrders),
